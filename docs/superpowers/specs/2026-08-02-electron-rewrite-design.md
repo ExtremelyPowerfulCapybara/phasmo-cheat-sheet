@@ -150,35 +150,46 @@ Persisted to `electron/shortcuts.json`. Hotkey Manager (`shortcuts-window.html`)
 
 ---
 
-## 6. Multiplayer / WebSocket
+## 6. Hosting Model
 
-### 6.1 Client (`electron/ws-client.js`)
+`phasmo.yourdomain.com` is permanently up — it serves the cheatsheet web page AND handles WebSocket rooms. Two types of users connect to it:
 
-- Connects to `ws://localhost:3000/room/{id}` (local) or `wss://phasmo.yourdomain.com/room/{id}` (cloud)
-- On local state change: `ws.send({ type, payload })`
+| User type | How they connect | Experience |
+|-----------|-----------------|------------|
+| Browser (friends) | Visit `phasmo.yourdomain.com` in any browser | Full cheatsheet + room sync, no install |
+| Electron (you) | Electron loads `https://phasmo.yourdomain.com` as its main window | Same web page + global hotkeys + overlay |
+
+Electron no longer spawns a local Node server. It loads the hosted URL directly. Redeploying the server updates all users (browser and Electron) automatically.
+
+## 7. Multiplayer / WebSocket
+
+### 7.1 Client (`electron/ws-client.js`)
+
+- Connects to `wss://phasmo.yourdomain.com/room/{id}`
+- On local state change (shortcut or checkbox): `ws.send({ type, payload })`
 - On remote message: calls the same `state.js` mutators as local actions
-- All connected clients hear the same audio cues via their own overlays
+- Electron overlay plays audio cues locally; browser users hear nothing (no overlay)
 
 **Synced events:** `timer-toggle`, `evidence-toggle`, `reset-all`
 
-### 6.2 Room flow
+### 7.2 Room flow
 
-- Player opens Electron app, enters a room ID (or creates one via the web page UI)
-- Room ID shared with friends out of band (Discord, etc.)
-- No host required — server runs 24/7 on cloud
-- Rooms are ephemeral (in-memory on server), no database needed
+1. Any player (browser or Electron) clicks **"Create Room"** on the web page → gets a room ID (e.g. `phasmo-3f7a`) → auto-copied to clipboard
+2. ID shared with friends via Discord/chat
+3. Friends visit `phasmo.yourdomain.com`, enter the room ID → instantly synced
+4. Rooms are ephemeral (in-memory on server) — new room each session, no database needed
 
-### 6.3 Server URL config (`electron/config.json`)
+### 7.3 Server URL (`electron/config.json`)
 
 ```json
-{ "serverUrl": "wss://phasmo.yourdomain.com" }
+{ "serverUrl": "https://phasmo.yourdomain.com" }
 ```
 
-Falls back to `ws://localhost:3000` if file is missing — app still works standalone.
+Electron reads this once at startup to know where to point the BrowserWindow and WS client. Required — no localhost fallback in the new architecture.
 
 ---
 
-## 7. Server Deployment
+## 8. Server Deployment
 
 `server.js` runs as a Docker container behind the user's existing Caddy reverse proxy.
 
@@ -227,7 +238,11 @@ Caddy handles `wss://` upgrade automatically. No extra config needed.
 
 ---
 
-## 8. Files
+## 9. Future Considerations (out of scope)
+
+- **Web page visual redesign** — `index.html` and `scripts-v10/` are standard HTML/CSS/JS static files. Layout, colors, typography, and component structure can be customized in a future pass without touching the Electron or server architecture.
+
+## 10. Files
 
 ### New
 | File | Purpose |
