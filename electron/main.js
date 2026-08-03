@@ -2,6 +2,8 @@ const { app, BrowserWindow, globalShortcut, ipcMain, screen } = require('electro
 const path = require('path');
 const fs   = require('fs');
 const state = require('./state.js');
+const overlayBounds  = require('./overlay-bounds.js');
+const overlaySettingsStore = require('./overlay-settings-store.js');
 
 const CONFIG_PATH    = path.join(__dirname, 'config.json');
 const SHORTCUTS_PATH = path.join(__dirname, 'shortcuts.json');
@@ -33,6 +35,8 @@ let mainWindow      = null;
 let overlay         = null;   // single combined overlay window
 let shortcutsWindow = null;
 let currentBindings = {};
+let overlaySettings       = overlaySettingsStore.DEFAULTS;
+let overlaySettingsWindow = null;
 
 // ── Shortcuts persistence ──────────────────────────────────────────────────────
 function loadShortcuts() {
@@ -130,13 +134,18 @@ function createMainWindow() {
 }
 
 function createOverlay() {
-  const { height } = screen.getPrimaryDisplay().workAreaSize;
+  const workAreaSize = screen.getPrimaryDisplay().workAreaSize;
+  const bounds = overlayBounds.computeOverlayBounds(
+    overlaySettings.corner,
+    overlaySettings.scale,
+    workAreaSize
+  );
 
   overlay = new BrowserWindow({
-    width:  280,
-    height: height - 40,
-    x:      8,
-    y:      20,
+    x:      bounds.x,
+    y:      bounds.y,
+    width:  bounds.width,
+    height: bounds.height,
     transparent:   true,
     alwaysOnTop:   true,
     frame:         false,
@@ -184,6 +193,30 @@ function openHotkeyManager() {
   shortcutsWindow.setMenuBarVisibility(false);
   shortcutsWindow.loadFile(path.join(__dirname, 'shortcuts-window.html'));
   shortcutsWindow.on('closed', () => { shortcutsWindow = null; });
+}
+
+function openOverlaySettingsWindow() {
+  if (overlaySettingsWindow && !overlaySettingsWindow.isDestroyed()) {
+    overlaySettingsWindow.focus();
+    return;
+  }
+  overlaySettingsWindow = new BrowserWindow({
+    width:       420,
+    height:      520,
+    title:       'Overlay Settings',
+    resizable:   false,
+    maximizable: false,
+    minimizable: false,
+    alwaysOnTop: true,
+    webPreferences: {
+      preload:          path.join(__dirname, 'preload-overlay-settings.js'),
+      contextIsolation: true,
+      nodeIntegration:  false,
+    },
+  });
+  overlaySettingsWindow.setMenuBarVisibility(false);
+  overlaySettingsWindow.loadFile(path.join(__dirname, 'overlay-settings-window.html'));
+  overlaySettingsWindow.on('closed', () => { overlaySettingsWindow = null; });
 }
 
 // ── Shortcuts ─────────────────────────────────────────────────────────────────
@@ -257,6 +290,34 @@ ipcMain.on('overlay-toggle-evidence', (_, index) => {
   execEvidenceToggle(index);
 });
 
+// Overlay settings window / overlay → main: read current overlay settings
+ipcMain.handle('overlay-settings-get', () => Object.assign({}, overlaySettings));
+
+// Overlay settings window → main: merge + persist + live-apply a partial settings update
+ipcMain.handle('overlay-settings-update', (_, partial) => {
+  const merged = Object.assign({}, overlaySettings, partial);
+  if (partial && partial.panels) {
+    merged.panels = Object.assign({}, overlaySettings.panels, partial.panels);
+  }
+  const next = overlaySettingsStore.normalize(merged);
+
+  const boundsAffectingChange = next.corner !== overlaySettings.corner || next.scale !== overlaySettings.scale;
+  overlaySettings = next;
+  overlaySettingsStore.save(overlaySettings);
+
+  if (overlay && !overlay.isDestroyed()) {
+    if (boundsAffectingChange) {
+      const workAreaSize = screen.getPrimaryDisplay().workAreaSize;
+      overlay.setBounds(overlayBounds.computeOverlayBounds(overlaySettings.corner, overlaySettings.scale, workAreaSize));
+    }
+    overlay.webContents.send('overlay-settings-update', overlaySettings);
+  }
+
+  return Object.assign({}, overlaySettings);
+});
+
+ipcMain.on('open-overlay-settings', () => openOverlaySettingsWindow());
+
 // Web page → main: timer toggle from WS remote action
 ipcMain.on('toggle-timer', (_, id) => state.toggleTimer(id));
 
@@ -265,6 +326,8 @@ ipcMain.on('reset-all', () => state.resetAll());
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
+  overlaySettings = overlaySettingsStore.load();
+
   createMainWindow();
   createOverlay();
 
@@ -281,6 +344,7 @@ app.whenReady().then(() => {
 
   applyShortcuts(loadShortcuts());
   globalShortcut.register('Control+Shift+K', openHotkeyManager);
+  globalShortcut.register('Control+Shift+O', openOverlaySettingsWindow);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
