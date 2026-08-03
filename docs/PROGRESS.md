@@ -91,5 +91,6 @@ verification as sufficient — treat it as a real open item and do a live manual
 work done.
 
 ## To Do
+- [x] Clickable overlay (2026-08-03)
 - [ ] Overlay customization
 - [ ] Web UI customization
