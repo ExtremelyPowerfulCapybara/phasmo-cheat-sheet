@@ -54,6 +54,10 @@
   }
   .evi-key { font-size: 8px; color: rgba(255,255,255,0.30); }
 
+  .evi-item { cursor: pointer; }
+  .evi-item:hover { opacity: 0.75; }
+  .evi-item.good:hover, .evi-item.bad:hover { opacity: 0.85; }
+
   /* Ghost list */
   .ghost-list { display: flex; flex-direction: column; gap: 2px; }
   .ghost { font-size: 12px; color: rgba(255,255,255,0.80); padding: 1px 0; }
@@ -86,31 +90,31 @@
 <div class="panel">
   <div class="sec-label">Evidence</div>
   <div class="evi-grid">
-    <div class="evi-item" data-evi="EMF 5">
+    <div class="evi-item" data-evi="EMF 5" data-idx="0">
       <img src="../../imgs/emf5-icon.png" alt="EMF 5">
       <span class="evi-key">^1</span>
     </div>
-    <div class="evi-item" data-evi="Ultraviolet">
+    <div class="evi-item" data-evi="Ultraviolet" data-idx="1">
       <img src="../../imgs/fingerprints-icon.png" alt="UV">
       <span class="evi-key">^2</span>
     </div>
-    <div class="evi-item" data-evi="Writing">
+    <div class="evi-item" data-evi="Writing" data-idx="2">
       <img src="../../imgs/writing-icon.png" alt="Writing">
       <span class="evi-key">^3</span>
     </div>
-    <div class="evi-item" data-evi="Ghost Orbs">
+    <div class="evi-item" data-evi="Ghost Orbs" data-idx="3">
       <img src="../../imgs/orbs-icon.png" alt="Orbs">
       <span class="evi-key">^4</span>
     </div>
-    <div class="evi-item" data-evi="Spirit Box">
+    <div class="evi-item" data-evi="Spirit Box" data-idx="4">
       <img src="../../imgs/spirit-box-icon.png" alt="Spirit Box">
       <span class="evi-key">^5</span>
     </div>
-    <div class="evi-item" data-evi="Freezing">
+    <div class="evi-item" data-evi="Freezing" data-idx="5">
       <img src="../../imgs/freezing-icon.png" alt="Freezing">
       <span class="evi-key">^6</span>
     </div>
-    <div class="evi-item" data-evi="DOTs">
+    <div class="evi-item" data-evi="DOTs" data-idx="6">
       <img src="../../imgs/dots-icon.png" alt="DOTS">
       <span class="evi-key">^7</span>
     </div>
@@ -206,6 +210,19 @@
     setEvidence({});
     document.getElementById('ghost-list').innerHTML =
       '<div class="ghost empty">No evidence selected</div>';
+  }
+
+  // ── Evidence panel: hover-driven interactivity + click-to-toggle ───────────
+  if (window.overlayAPI) {
+    const evidencePanel = document.querySelector('.evi-grid').closest('.panel');
+    evidencePanel.addEventListener('mouseenter', () => window.overlayAPI.setInteractive(true));
+    evidencePanel.addEventListener('mouseleave', () => window.overlayAPI.setInteractive(false));
+
+    document.querySelectorAll('.evi-item').forEach(el => {
+      el.addEventListener('click', () => {
+        window.overlayAPI.toggleEvidence(parseInt(el.dataset.idx, 10));
+      });
+    });
   }
 
   // ── Wire IPC ──────────────────────────────────────────────────────────────
