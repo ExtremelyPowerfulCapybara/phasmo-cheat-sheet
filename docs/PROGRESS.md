@@ -130,6 +130,19 @@ overlay's CSS was refactored from hardcoded colors to theme-scoped custom proper
 `--accent`, etc.) so `.theme-default` reproduces the pre-existing look exactly, with three additional theme
 blocks layered on top.
 
+**Packaged-build bug found and fixed by testing the actual installer (not just `npm start`)**: settings
+appeared to save (UI updated instantly, overlay changed live) but silently reverted to defaults on the next
+launch. Root cause: both `electron/shortcuts.json` and the new `electron/overlay-settings.json` were written
+to `path.join(__dirname, ...)`, which in dev is a normal folder but in a packaged build resolves *inside* the
+read-only `app.asar` archive — `fs.writeFileSync` there fails, caught silently by the existing try/catch.
+Fixed by switching both files to `app.getPath('userData')` (`%APPDATA%\phasmo-cheat-sheet\` on Windows), the
+standard Electron location for this kind of generated, per-install state. Verified against a rebuilt,
+reinstalled copy of the actual `.exe`: corner/scale/theme/panel choices and a rebound hotkey both now survive
+a full quit and relaunch. This bug predated this session (shortcuts.json had the same flaw) but had never
+been caught because no prior session tested settings persistence against the *packaged* app specifically —
+worth remembering that `npm start` and the installed `.exe` can behave differently for anything touching
+`__dirname`-relative file writes.
+
 Built via the full brainstorm → spec → plan → implementation workflow — see
 `docs/superpowers/specs/2026-08-03-overlay-customization-design.md` and
 `docs/superpowers/plans/2026-08-03-overlay-customization.md`.
