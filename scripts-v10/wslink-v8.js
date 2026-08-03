@@ -1,18 +1,9 @@
-let ws = null
-let dlws = null
+// wslink-v8.js — local fork. Desktop link (dlws) entirely removed.
+// Journal WebSocket connects to the local Node server instead of zero-network.net.
 
-let reconn_id = null
-let kill_gracefully = false
-let reconnecting = false
-let relink_interval = null
-let relink_timeout = null
-let relink_live = false
-let reconnectAttempts = 0
-let missedPongs = 0
+let ws = null
 
 var ws_ping;
-var dlws_ping;
-var await_dlws_pong = false
 
 var state_received = false
 var map_loaded = false
@@ -24,8 +15,6 @@ let broadcast_audio = new Audio("assets/broadcast-alert.mp3")
 broadcast_audio.preload = 'auto';
 broadcast_audio.load();
 
-let connectionState = "closed"; // "connecting" | "connected" | "reconnecting" | "closed"
-
 var my_pos = 0
 var pos_colors = {
     1:"ff0000",
@@ -34,7 +23,12 @@ var pos_colors = {
     4:"ca36dd"
 }
 
-// --------------- Override WS send
+// Globals expected by removed modules
+var data_user  = {}
+var polled     = false
+var hasDLLink  = false
+
+// --------------- Override WS send (queue messages while CONNECTING)
 
 const wssend = WebSocket.prototype.send
 
@@ -42,14 +36,12 @@ WebSocket.prototype.send = function(message){
     if(this.readyState == WebSocket.OPEN){
         wssend.call(this, message)
     }
-
     else if(this.readyState == WebSocket.CONNECTING){
         const timeout = setTimeout(() => {
             if(this.readyState != WebSocket.OPEN){
                 console.error("Socket did not open in time, message not sent")
             }
         },5000)
-
         const interval = setInterval(() => {
             if(this.readyState === WebSocket.OPEN){
                 clearTimeout(timeout)
@@ -58,14 +50,12 @@ WebSocket.prototype.send = function(message){
             }
         },250)
     }
-
     else{
         console.warn("Socket not open or connecting. Failed to send message")
     }
-
 }
 
-// --------------------------------
+// ── Broadcast banner ──────────────────────────────────────────────────────────
 
 function mute_broadcast(){
     muteBroadcast = document.getElementById("mute_broadcast").checked
@@ -92,7 +82,7 @@ function broadcast(message, remain=10000, play_sound = true){
     let timerBar = document.getElementById("broadcast-timer-bar");
     let duration = 10000
     let timeLeft = remain
-    
+
     broadcast_interval = setInterval(() => {
         timeLeft -= 100;
         const widthPercent = (timeLeft / duration) * 100;
@@ -118,14 +108,10 @@ function resume_broadcast(){
     }
 }
 
-function isUUIDv4(str) {
-    const uuidv4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    return uuidv4Regex.test(str);
-}
+// ── Room auto-connect ─────────────────────────────────────────────────────────
 
 function auto_link(){
     var room_id = getCookie("room_id")
-    var link_id = getCookie("link_id")
     if(room_id){
         var r = document.getElementById("room_id")
         setTimeout(function(){
@@ -133,41 +119,7 @@ function auto_link(){
             link_room()
         },1)
     }
-    if(link_id){
-        console.log(`Found previous link_id: ${link_id}`)
-        if(isUUIDv4(link_id)){
-            console.log("Detected reconnect link, attempting reconnect")
-            reconn_id = link_id
-            reconnecting = true
-            document.getElementById("dllink_status").className = "pending"
-            document.getElementById("link_id_note").innerText = `${lang_data['{{status}}']}: ${lang_data['{{awaiting_link}}']}`
-            reconnect_link()
-        }
-        else{
-            var l = document.getElementById("link_id")
-            setTimeout(function(){
-                l.value = link_id
-                link_link()
-            },1)
-        }
-    }
-    else{
-        params = new URL(window.location.href).searchParams
-        if(params.get("autolink") == 'true'){
-            setTimeout(function(){
-                create_link(true)
-            },1)
-        }
-    }
-}
-
-function copy_code(){
-    var copyText = document.getElementById("link_id").value
-    ZNCopyShare(copyText,"Copy Link ID")
-    $("#link_id_cover").fadeIn(150)
-    setTimeout(function(){
-        $("#link_id_cover").fadeOut(150)
-    },1000)
+    // Desktop link auto-link intentionally removed
 }
 
 function copy_url_code(){
@@ -178,6 +130,8 @@ function copy_url_code(){
         $("#room_id_cover").fadeOut(150)
     },1000)
 }
+
+// ── Room creation & connection ────────────────────────────────────────────────
 
 function create_room(){
     var outgoing_state = {
@@ -199,7 +153,7 @@ function create_room(){
             "ghost_modifier":parseInt(document.getElementById("ghost_modifier_speed").value)
         }
     }
-    fetch(`https://zero-network.net/znlink/create-room/${znid}`,{method:"POST",Accept:"application/json",body:JSON.stringify(outgoing_state),signal: AbortSignal.timeout(6000)})
+    fetch(`/create-room`,{method:"POST",Accept:"application/json",body:JSON.stringify(outgoing_state),signal: AbortSignal.timeout(6000)})
     .then(response => response.json())
     .then(data => {
         var room_id = data['room_id']
@@ -211,34 +165,11 @@ function create_room(){
     });
 }
 
-function create_link(auto_link = false){
-    clearInterval(relink_interval)
-    clearTimeout(relink_timeout)
-    reconnecting = false
-    kill_gracefully = false
-    relink_live = false
-    relink_interval = null
-    relink_timeout = null
-    fetch(`https://zero-network.net/znlink/create-link/${znid}`,{method:"POST",Accept:"application/json",signal: AbortSignal.timeout(6000)})
-    .then(response => response.json())
-    .then(data => {
-        var link_id = data['link_id']
-        document.getElementById("link_id").value = link_id
-        link_link()
-        if(auto_link){
-            var url = `zndl:${link_id}`
-            $('<iframe src="' + url + '" width="1px" height="1px" style="display:none;">').appendTo('body');
-        }
-    })
-    .catch(response => {
-        console.error(response)
-    });
-}
-
 function link_room(){
     var room_id = document.getElementById("room_id").value
     var load_pos = getCookie("link-position")
-    ws = new WebSocket(`wss://zero-network.net/phasmolink/link/${znid}/${room_id}${load_pos ? '?pos='+load_pos : ''}`);
+    var proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
+    ws = new WebSocket(`${proto}://${window.location.host}/room/${room_id}${load_pos ? '?pos='+load_pos : ''}`);
     setCookie("room_id",room_id,1)
 
     ws.onopen = function(event){
@@ -249,7 +180,6 @@ function link_room(){
         $('.card_icon_guess').show()
         document.getElementById("room_id_note").innerText = `${lang_data['{{status}}']}: ${lang_data['{{connected}}']}`
         document.getElementById("settings_status").className = "connected"
-        sync_sjl_dl()
         ws_ping = setInterval(function(){
             send_ping()
         }, 30000)
@@ -258,11 +188,9 @@ function link_room(){
         document.getElementById("room_id_note").innerText = `${lang_data['{{error}}']}: ${lang_data['{{could_not_connect}}']}`
         document.getElementById("settings_status").className = "error"
         setCookie("room_id","",-1)
-        document.getElementById("map-explorer-link-2").href = `https://zero-network.net/phasmo-cheat-sheet/map-explorer/`
     }
     ws.onmessage = function(event) {
         try {
-            
             document.getElementById("settings_status").className = "connected"
             if(event.data == "-"){
                 state_received = true
@@ -278,8 +206,6 @@ function link_room(){
                 pos_elem.style.border = `2px solid #${pos_colors[my_pos]}`
                 pos_elem.style.backgroundColor = `#${pos_colors[my_pos]}44`
                 $(pos_elem).show()
-                var lmap = document.getElementsByClassName("selected_map")[0].id
-                document.getElementById("map-explorer-link-2").href = `https://zero-network.net/phasmo-cheat-sheet/map-explorer/?jlid=${room_id}&pos=${my_pos}&share=${lmap}`
                 if($(".guessed").length > 0){
                     send_guess($(".guessed")[0].id)
                 }
@@ -302,7 +228,7 @@ function link_room(){
                     return
                 }
                 if (action == "GUESS"){
-                    try { document.getElementById(`guess_pos_${incoming_state['pos']}`).remove()} catch (error) {} 
+                    try { document.getElementById(`guess_pos_${incoming_state['pos']}`).remove()} catch (error) {}
                     if(incoming_state['ghost']){
                         document.getElementById(incoming_state['ghost']).querySelector(".ghost_guesses").innerHTML += `
                         <div id="guess_pos_${incoming_state['pos']}" class="ghost_guess" title="${incoming_state['ds_image'] ? incoming_state['ds_name'] : ('Player ' + incoming_state['pos'])}" style="${incoming_state['ds_image'] ? 'background-image: url('+incoming_state['ds_image']+');' : 'background-color: #'+pos_colors[incoming_state['pos']]+'44;'} border: 2px solid #${pos_colors[incoming_state['pos']]};">
@@ -316,37 +242,14 @@ function link_room(){
                         send_guess($(".guessed")[0].id)
                     }
                 }
-                if (action == "TIMER"){
-                    if(incoming_state.hasOwnProperty("force_start") && incoming_state.hasOwnProperty("force_stop")){
-                        toggle_timer(incoming_state["force_start"], incoming_state["force_stop"])
-                    }
-                    else{
-                        toggle_timer()
-                    }
+                if (action == "TIMER") {
+                    if (window.electronAPI) window.electronAPI.toggleTimer('smudge');
                 }
-                if (action == "COOLDOWNTIMER"){
-                    if(incoming_state.hasOwnProperty("force_start") && incoming_state.hasOwnProperty("force_stop")){
-                        toggle_cooldown_timer(incoming_state["force_start"], incoming_state["force_stop"])
-                    }
-                    else{
-                        toggle_cooldown_timer()
-                    }
+                if (action == "COOLDOWNTIMER") {
+                    if (window.electronAPI) window.electronAPI.toggleTimer('cooldown');
                 }
-                if (action == "HUNTTIMER"){
-                    if(incoming_state.hasOwnProperty("force_start") && incoming_state.hasOwnProperty("force_stop")){
-                        toggle_hunt_timer(incoming_state["force_start"], incoming_state["force_stop"])
-                    }
-                    else{
-                        toggle_hunt_timer()
-                    }
-                }
-                if (action == "SOUNDTIMER"){
-                    if(incoming_state.hasOwnProperty("force_start") && incoming_state.hasOwnProperty("force_stop")){
-                        toggle_sound_timer(incoming_state["force_start"], incoming_state["force_stop"])
-                    }
-                    else{
-                        toggle_sound_timer()
-                    }
+                if (action == "HUNTTIMER") {
+                    if (window.electronAPI) window.electronAPI.toggleTimer('hunt');
                 }
                 if (action == "CHANGE"){
                     document.getElementById("room_id_note").innerText = `STATUS: Connected (${incoming_state['players']})`
@@ -359,23 +262,8 @@ function link_room(){
                 }
                 if (action == "POLL"){
                     polled = true
-                    if(Object.keys(data_user).length > 0 && document.getElementById("force_selection").checked){
-                        if (hasSelected()){
-                            ws.send('{"action":"READY"}')
-                            $("#reset").html(lang_data['{{waiting_for_others}}'])
-                        }
-                        else{
-                            $("#reset").removeClass("standard_reset")
-                            $("#reset").addClass("reset_pulse")
-                            $("#reset").html(`${lang_data['{{no_ghost_selected}}']}<div class='reset_note'>(${lang_data['{{double_click_to_reset']})</div>`)
-                            $("#reset").attr("onclick",null)
-                            $("#reset").attr("ondblclick","reset()")
-                        }
-                    }
-                    else{
-                        ws.send('{"action":"READY"}')
-                        $("#reset").html(lang_data['{{waiting_for_others}}'])
-                    }
+                    ws.send('{"action":"READY"}')
+                    $("#reset").html(lang_data['{{waiting_for_others}}'])
                 }
                 return
             }
@@ -386,7 +274,7 @@ function link_room(){
                 document.getElementById("settings_status").className = "error"
                 if (incoming_state.hasOwnProperty("disconnect") && incoming_state['disconnect']){
                     disconnect_room(false,true)
-                } 
+                }
                 return
             }
 
@@ -467,14 +355,14 @@ function link_room(){
                     showCustom()
                     flashMode()
                 }
-                
+
                 if(document.getElementById("ghost_modifier_speed").value != incoming_state['settings']['ghost_modifier']){
                     document.getElementById("ghost_modifier_speed").value = incoming_state['settings']['ghost_modifier']
                 }
 
                 saveSettings()
 
-                for (const [key, value] of Object.entries(incoming_state["ghosts"])){ 
+                for (const [key, value] of Object.entries(incoming_state["ghosts"])){
                     if (value == 0 || value == 1){
                         if(state['ghosts'][key] == 2){
                             select(document.getElementById(key),true);
@@ -529,7 +417,7 @@ function link_room(){
 
                 var prev_evidence = state['evidence']
                 var new_mp = false
-                for (const [key, value] of Object.entries(incoming_state["evidence"])){ 
+                for (const [key, value] of Object.entries(incoming_state["evidence"])){
 
                     if(value == -2){
                         if(prev_evidence[key] != -2){
@@ -546,12 +434,12 @@ function link_room(){
                         }
                     }
                 }
-                for (const [key, value] of Object.entries(incoming_state["speed"])){ 
+                for (const [key, value] of Object.entries(incoming_state["speed"])){
                     while (!$(document.getElementById(key).querySelector("#checkbox")).hasClass(["neutral","good"][value])){
                         dualstate(document.getElementById(key),true);
                     }
                 }
-                for (const [key, value] of Object.entries(incoming_state["sanity"])){ 
+                for (const [key, value] of Object.entries(incoming_state["sanity"])){
                     while (!$(document.getElementById(key).querySelector("#checkbox")).hasClass(["neutral","good"][value])){
                         dualstate(document.getElementById(key),true,true);
                     }
@@ -589,7 +477,7 @@ function link_room(){
                         toggleBloodMoon(false,true,true)
                     }
                 }
-                
+
                 filter(true)
                 state_received = true
             }
@@ -597,404 +485,6 @@ function link_room(){
         } catch (error){
             console.log(error)
             console.log(event.data)
-        }
-    }
-}
-
-function reconnect_link(reconnect=true){
-    relink_interval = setInterval(() =>{
-        try{
-            if(!relink_live){
-            console.log(`Attempting to reconnect...`)
-                relink_live = true
-                link_link(reconnect)
-            }
-        }catch(e){
-            console.error(e)
-            //Om nom nom
-        }
-    },5000)
-
-    relink_timeout = setTimeout(() => {
-        console.warn("Unable to reconnect to server!")
-        clearInterval(relink_interval)
-        disconnect_link(false,false,1005,"Cheat Sheet unable to reconnect")
-        document.getElementById("link_id_note").innerText = `${lang_data['{{error}}']}: ${lang_data['{{could_not_connect}}']}`
-        document.getElementById("dllink_status").className = "error"
-        setCookie("link_id","",-1)
-    },5 * 60 * 1000)
-}
-
-function scheduleReconnect(force = false) {
-    if (kill_gracefully) return;
-
-    // Clear any competing reconnection mechanisms
-    clearInterval(relink_interval);
-    clearTimeout(relink_timeout);
-    relink_interval = null;
-    relink_timeout = null;
-    relink_live = false;
-
-    connectionState = "reconnecting";
-
-    reconnectAttempts++;
-    const delay = Math.min(5000, 500 * Math.pow(2, reconnectAttempts)); // exponential backoff up to 5s
-
-    console.log(`[WS] Reconnecting in ${delay}ms... (attempt ${reconnectAttempts})`);
-    setTimeout(() => link_link(true), delay);
-}
-
-function start_dlws_ping() {
-    if (dlws_ping) clearInterval(dlws_ping);
-    missedPongs = 0;
-    await_dlws_pong = false;
-
-    dlws_ping = setInterval(() => {
-        if (await_dlws_pong) {
-            missedPongs++;
-            console.warn(`[WS] Missed pong ${missedPongs}/3`);
-            if (missedPongs >= 3) {
-                console.error("[WS] No pong after 3 intervals — closing");
-                disconnect_link(false,false,1000,"Desktop Link Stopped Responding");
-            }
-        } else {
-            send_ping_link();
-            await_dlws_pong = true;
-        }
-    }, 30000);
-}
-
-function link_link(reconnect = false){
-    let conn_id = document.getElementById("link_id").value 
-    var link_id = reconnect || !conn_id ? reconn_id : conn_id
-
-    // Prevent overlapping reconnect attempts
-    if (reconnecting && reconnect) {
-        console.warn("[WS] Reconnect already in progress, skipping");
-        relink_live = false; // Reset flag so next attempt can proceed
-        return;
-    }
-
-    reconnecting = reconnect;
-    connectionState = reconnect ? "reconnecting" : "connecting";
-    console.log(`[WS] Connecting... reconnect=${reconnect}, link_id=${link_id}`);
-
-    // Clear old websocket if needed
-    if (dlws && dlws.readyState !== WebSocket.CLOSED) {
-        try { dlws.close(); } catch {}
-    }
-
-    try {
-        dlws = new WebSocket(`wss://zero-network.net/phasmolink/link/${link_id}?me=ZNCS${reconnect ? "&reconnect=true" : ""}`);
-    } catch (e) {
-        console.error("[WS] Connection failed:", e);
-        scheduleReconnect();
-        return;
-    }
-    
-    if (!reconnect && link_id) setCookie("link_id", link_id, 1);
-
-    dlws.onopen = function () {
-        console.log("[WS] Connected!");
-        connectionState = "connected";
-        reconnecting = false;
-        reconnectAttempts = 0;
-        missedPongs = 0;
-        kill_gracefully = false;
-        await_dlws_pong = false;
-        hasDLLink = true;
-
-        // Clear all reconnection timers
-        clearInterval(relink_interval);
-        clearTimeout(relink_timeout);
-        relink_interval = null;
-        relink_timeout = null;
-        relink_live = false;
-
-        clearInterval(dlws_ping);
-        dlws_ping = null;
-
-        $("#link_id_create").hide();
-        $("#link_id_create_launch").hide();
-        $("#link_id_disconnect").show();
-
-        toggleSanitySettings();
-        document.getElementById("link_id_note").innerText = `${lang_data['{{status}}']}: ${lang_data['{{awaiting_link}}']}`;
-        document.getElementById("dllink_status").className = "pending";
-        sync_sjl_dl();
-    };
-
-    dlws.onerror = function (event) {
-        console.error("[WS] Error:", event);
-        if (connectionState !== "reconnecting") {
-            document.getElementById("link_id_note").innerText =
-                `${lang_data['{{error}}']}: ${lang_data['{{could_not_connect}}']}`;
-            document.getElementById("dllink_status").className = "error";
-        }
-    };
-
-    dlws.onclose = function (event) {
-        console.warn(`[WS] Closed: code=${event.code}, reason=${event.reason}`);
-        connectionState = "closed";
-        hasDLLink = false;
-
-        clearInterval(dlws_ping);
-        dlws_ping = null;
-
-        if (!kill_gracefully) {
-            scheduleReconnect(event.reason !== "keepalive ping timeout");
-        }
-    };
-
-    dlws.onmessage = function(event) {
-        try {
-            const incoming_state = JSON.parse(event.data);
-
-            // Reset pong counter on valid messages
-            missedPongs = 0;
-
-            if (!incoming_state.action && incoming_state.error) {
-                document.getElementById("link_id_note").innerText =
-                    `${lang_data['{{error}}']}: ${incoming_state['error']}!`;
-                document.getElementById("dllink_status").className = "error";
-                return;
-            }
-
-            if (incoming_state.hasOwnProperty("disconnect") && incoming_state["disconnect"]) {
-                disconnect_link(false,true,1000,"Server or Desktop Link requested Cheat Sheet to disconnect")
-                return;
-            }
-
-            const action = incoming_state.action ? incoming_state.action.toUpperCase() : null;
-            if (!action) return;
-
-            if (action === "?") return dlws.send('{"action":"!"}');
-            if (action === "PONG") { await_dlws_pong = false; missedPongs = 0; return; }
-            if (action === "RECONN") { reconn_id = incoming_state.message; return; }
-            if (action === "BROADCAST") { broadcast(incoming_state['message']); return; }
-            if (action == "FORCERESET" ){ reset(); return; }
-
-            if (action === "LINKED") {
-                document.getElementById("link_id_note").innerText =
-                    `${lang_data['{{status}}']}: ${lang_data['{{linked}}']}`;
-                document.getElementById("dllink_status").className = "connected";
-
-                if (incoming_state.hasOwnProperty("message")) {
-                    console.log(`Relinked with new link_id: ${incoming_state.message}`);
-                    document.getElementById("link_id").value = incoming_state.message;
-                    setCookie("link_id", incoming_state.message, 1);
-                }
-
-                dlws.send('{"action":"LINK"}');
-                send_data_link();
-                send_map_preload_link();
-                send_sanity_link(Math.round(sanity), sanity_color());
-                send_timer_link("TIMER_VAL", "0:00");
-                send_timer_link("COOLDOWN_VAL", "0:00");
-                send_timer_link("HUNT_VAL", "0:00");
-                send_timer_link("SOUND_VAL", "0:00");
-                send_bpm_link("-", "-", ["50%", "75%", "100%", "125%", "150%"][parseInt($("#ghost_modifier_speed").val())]);
-                send_modifier_link()
-                filter();
-
-                start_dlws_ping();
-                return;
-            }
-
-            if (action == "NEXTMAP"){
-                let cur_map_elem = document.getElementById("maps_list").querySelector(".selected_map").nextSibling
-                if (cur_map_elem === undefined || cur_map_elem === null)
-                    cur_map_elem = document.getElementById("maps_list").children[0]
-                changeMap(cur_map_elem,cur_map_elem.onclick.toString().match(/(http.+?)'\)/)[1],true)
-                saveSettings()
-                send_cur_map_link()
-                send_state()
-            }
-
-            else if (action == "PREVMAP"){
-                let cur_map_elem = document.getElementById("maps_list").querySelector(".selected_map").previousSibling
-                if (cur_map_elem === undefined || cur_map_elem === null)
-                    cur_map_elem = document.getElementById("maps_list").children[document.getElementById("maps_list").children.length-1]
-                changeMap(cur_map_elem,cur_map_elem.onclick.toString().match(/(http.+?)'\)/)[1],true)
-                saveSettings()
-                send_cur_map_link()
-                send_state()
-            }
-
-            else if (action == "NEXTMAPTYPE"){
-                switchMapType(true,false)
-                saveSettings()
-                send_cur_map_link()
-            }
-
-            else if (action == "PREVMAPTYPE"){
-                switchMapType(false,true)
-                saveSettings()
-                send_cur_map_link()
-            }
-
-            else if (action == "EVENTMAP"){
-                document.getElementById("map_event_check_box").checked = !document.getElementById("map_event_check_box").checked
-                changeMap(document.getElementById('maps_list').querySelector('.selected_map'),all_maps[document.getElementById('maps_list').querySelector('.selected_map').id])
-                saveSettings()
-                send_cur_map_link()
-            }
-
-            else if (action == "GHOSTDATA"){ send_ghost_data_link(incoming_state['ghost']); return; }
-            else if (action == "GHOSTTESTS"){ send_ghost_tests_link(incoming_state['ghost']); return; }
-            else if (action == "GHOSTSELECT"){ select(document.getElementById(incoming_state['ghost'])); return; }
-            else if (action == "GHOSTNOT"){ fade(document.getElementById(incoming_state['ghost'])); return; }
-            else if (action == "GHOSTDIED"){ died(document.getElementById(incoming_state['ghost'])); return; }
-
-            else if (action == "GHOSTCYCLE"){
-                if($(document.getElementById(incoming_state['ghost'])).hasClass(["selected","died"])){
-                    died(document.getElementById(incoming_state['ghost']))
-                }
-                else{
-                    select(document.getElementById(incoming_state['ghost']))
-                }
-            }
-
-            else if (action == "TIMER"){
-                let force_start = incoming_state.hasOwnProperty("reset") && incoming_state["reset"] ? true : false;
-                toggle_timer(force_start)
-                send_timer(force_start)
-            }
-
-            else if (action == "COOLDOWNTIMER"){
-                let force_start = incoming_state.hasOwnProperty("reset") && incoming_state["reset"] ? true : false;
-                toggle_cooldown_timer(force_start)
-                send_cooldown_timer(force_start)
-            }
-
-            else if (action == "HUNTTIMER"){
-                let force_start = incoming_state.hasOwnProperty("reset") && incoming_state["reset"] ? true : false;
-                toggle_hunt_timer(force_start)
-                send_hunt_timer(force_start)
-            }
-
-            else if (action == "SOUNDTIMER"){
-                let force_start = incoming_state.hasOwnProperty("reset") && incoming_state["reset"] ? true : false;
-                toggle_sound_timer(force_start)
-                send_sound_timer(force_start)
-            }
-
-            else if (action == "OBAMBOTIMER"){
-                toggle_obambo_timer()
-            }
-
-            else if (action == "DL_STEP"){
-                if (incoming_state.hasOwnProperty("timestamp")){
-                    bpm_tap(incoming_state["timestamp"])
-                }
-                else{
-                    bpm_tap()
-                }
-            }
-
-            else if (action == "NEXTMODE"){
-                // Cycle
-                // NOMODIFIER -> BLOODMOON -> FORESTMINION -> BLOODMINION -> COAL -> BLOODCOAL -> <repeat>
-
-                bm = $("#blood-moon-icon").hasClass("blood-moon-active")
-                bma = $("#blood-moon-icon").css("display") != "none"
-                fm = $("#forest-minion-mod").text() != '0'
-                fma = $("#forest-minion-icon").css("display") != "none"
-                cm = $("#coal-icon").hasClass("coal-active")
-                cma = $("#coal-icon").css("display") != "none"
-
-                if (!bm && !fm && !cm){ // NOMODIFIER
-                    toggleBloodMoon(bma,!bma)
-                    toggleForestMinion(0,true,true)
-                    toggleCoal(false,true)
-                }
-                else if (bm && !fm && !cm){ // BLOODMOON
-                    toggleBloodMoon(false,true)
-                    toggleForestMinion(1,fma,!fma)
-                    toggleCoal(cma && !fma,!cma || fma)
-                }
-                else if (!bm && fm && !cm){ // FORESTMINION
-                    toggleBloodMoon(bma,!bma)
-                    toggleForestMinion(1,fma,!fma)
-                    toggleCoal(false,true)
-                }
-                else if (bm && fm && !cm){ // BLOODMINION
-                    toggleBloodMoon(false,true)
-                    toggleForestMinion(0,true,true)
-                    toggleCoal(cma,!cma)
-                }
-                else if (!bm && !fm && cm){ // COAL
-                    toggleBloodMoon(bma,!bma)
-                    toggleForestMinion(0,true,true)
-                    toggleCoal(cma,!cma)
-                }
-                else if (bm && !fm && cm){ // BLOODCOAL
-                    toggleBloodMoon(false,true)
-                    toggleForestMinion(0,true,true)
-                    toggleCoal(false,true)
-                }
-                send_modifier_link()
-            }
-
-            else if (action == "SANITY"){
-                if(incoming_state['value'].toUpperCase() == "TOGGLE"){
-                    toggle_sanity_drain()
-                }
-                else if(incoming_state['value'].toUpperCase() == "RESTORE"){
-                    restore_sanity()
-                }
-                else if(incoming_state['value'].toUpperCase() == "RESET"){
-                    reset_sanity()
-                }
-                else{
-                    adjust_sanity(parseInt(incoming_state['value']))
-                }
-            }
-
-            else if (action == "DL_RESET"){
-                bpm_clear()
-                saveSettings()
-            }
-
-            else if (action == "MENUFLIP"){ toggleFilterTools()}
-
-            else if(action == "SAVERESET"){
-                if(Object.keys(data_user).length > 0 && document.getElementById("force_selection").checked){
-                    if(!hasSelected()){
-                        send_ghost_link("None Selected!",-1)
-                        $("#reset").removeClass("standard_reset")
-                        $("#reset").addClass("reset_pulse")
-                        $("#reset").html(`${lang_data['{{no_ghost_selected}}']}<div class='reset_note'>${lang_data['{{say_force_reset}}']}</div>`)
-                        $("#reset").prop("onclick",null)
-                        $("#reset").prop("ondblclick","reset()")
-                        reset_voice_status()
-                    }
-                    else{
-                        reset()
-                    }
-                }
-                else{
-                    reset()
-                }
-            }
-            
-            else if (action == "EVIDENCE"){
-                if(!$(document.getElementById(incoming_state['evidence']).querySelector("#checkbox")).hasClass("block")){
-                    tristate(document.getElementById(incoming_state['evidence']))
-                }
-            }
-
-            else if (action == "UNLINK"){
-                kill_gracefully = true
-                let mes = incoming_state.hasOwnProperty("message") ? incoming_state.message : null
-                disconnect_link(false,false,1000,mes)
-            }
-
-            return
-
-        } catch (error){
-            console.log(event.data)
-            console.error(error)
         }
     }
 }
@@ -1012,14 +502,11 @@ function continue_session(){
 function disconnect_room(reset=false,has_status=false){
     ws.close()
     $(document.getElementById("link_pos")).hide()
-    try { document.getElementById(`guess_pos_1`).remove()} catch (error) {} 
-    try { document.getElementById(`guess_pos_2`).remove()} catch (error) {} 
-    try { document.getElementById(`guess_pos_3`).remove()} catch (error) {} 
-    try { document.getElementById(`guess_pos_4`).remove()} catch (error) {} 
-    var lmap = document.getElementsByClassName("selected_map")[0].id
-    document.getElementById("map-explorer-link-2").href = `https://zero-network.net/phasmo-cheat-sheet/map-explorer/?share=${lmap}`
-    if (Object.keys(data_user).length == 0)
-        $('.card_icon_guess').hide()
+    try { document.getElementById(`guess_pos_1`).remove()} catch (error) {}
+    try { document.getElementById(`guess_pos_2`).remove()} catch (error) {}
+    try { document.getElementById(`guess_pos_3`).remove()} catch (error) {}
+    try { document.getElementById(`guess_pos_4`).remove()} catch (error) {}
+    $('.card_icon_guess').hide()
     clearInterval(ws_ping)
     if (!reset){
         $("#room_id_create").show()
@@ -1036,255 +523,7 @@ function disconnect_room(reset=false,has_status=false){
     }
 }
 
-function send_bpm_link(bpm,speed,modifer){
-    if(hasDLLink){
-        dlws.send(`{"action":"BPM","bpm":"${bpm}","speed":"${speed}","modifier":"${modifer}"}`)
-    }
-}
-
-function send_timer_link(timer,value,alt_color = 0){
-    if(hasDLLink){
-        dlws.send(`{"action":"${timer}","timer_val":"${value}","status":${alt_color}}`)
-    }
-}
-
-function send_ghost_link(ghost,value){
-    if(hasDLLink){
-        dlws.send(`{"action":"GHOST","ghost":"${ghost}","status":${value}}`)
-    }
-}
-
-function send_ghost_data_link(ghost){
-    if(hasDLLink){
-        var readd_classes = []
-        if($(document.getElementById(ghost)).hasClass("hidden"))
-            readd_classes.push("hidden")
-        if($(document.getElementById(ghost)).hasClass("permhidden"))
-            readd_classes.push("permhidden")
-
-        $(document.getElementById(ghost)).removeClass(readd_classes)
-        exclude_data = document.getElementById(ghost).querySelector(".ghost_behavior").querySelector("zcut")?.innerText
-        data = document.getElementById(ghost).querySelector(".ghost_evidence").innerText.trim().replaceAll("\n",", ") + (ghost == "The Mimic" ? (", *" + all_evidence["Ghost Orbs"]) : "") + "\n"
-        data += document.getElementById(ghost).querySelector(".ghost_behavior").innerText.replaceAll(`${lang_data['{{0_evidence_tests}}']} >>`,"").trim()
-        if (exclude_data)
-            data = data.replaceAll(exclude_data,"")
-        data = data.replace(`${lang_data['{{tells}}']}`,`\n<b>${lang_data['{{tells}}']}:<b>\n`)
-        data = data.replace(`${lang_data['{{behaviors}}']}`,`\n<b>${lang_data['{{behaviors}}']}:<b>\n`)
-        data = data.replace(`${lang_data['{{abilities}}']}`,`\n<b>${lang_data['{{abilities}}']}:<b>\n`)
-        data = data.replace(`${lang_data['{{hunt_sanity}}']}`,`\n<b>${lang_data['{{hunt_sanity}}']}:<b>\n`)
-        data = data.replace(`${lang_data['{{hunt_speed}}']}`,`\n<b>${lang_data['{{hunt_speed}}']}:<b>\n`)
-        data = data.replace(`${lang_data['{{evidence}}']}`,`\n<b>${lang_data['{{evidence}}']}:<b>\n`)
-        data = data.replace(`\n[${lang_data['{{known_bugs}}']}]`,'')
-        data = data.replace(`\n[${lang_data['{{more_details}}']}]`,'')
-        data = data.replace(`Tests >>\n`,"")
-        data = data.replace("🔊","")
-        data = data.replaceAll("<b>\n\n","<b>\n")
-        data = data.replace(/[ ]+/g,' ').trim()
-        $(document.getElementById(ghost)).addClass(readd_classes)
-        
-        dlws.send(JSON.stringify({"action":"GHOSTDATA","ghost":`${ghost}|${data}`}))
-    }
-}
-
-function send_ghost_tests_link(ghost){
-    if(hasDLLink){
-        exclude_data = document.getElementById(`wiki-0-evidence-${ghost.toLowerCase().replace(" ","-")}`).nextElementSibling.querySelector("zcut")?.innerText
-        data = document.getElementById(`wiki-0-evidence-${ghost.toLowerCase().replace(" ","-")}`).nextElementSibling.innerText.replace(`† ${lang_data["{{mimic_disclaimer}}"]}`,"").replace(lang_data["{{copy_share_link}}"],"").replace("†","").trim()
-        if (exclude_data)
-            data = data.replaceAll(exclude_data,"")
-        data = data.replace(`${lang_data['{{abilities_behaviors_tells}}']}`,`<b>${lang_data['{{abilities_behaviors_tells}}']}:<b>`)
-        data = data.replace(`${lang_data['{{confirmation_tests}}']}`,`\n<b>${lang_data['{{confirmation_tests}}']}:<b>`)
-        data = data.replace(`${lang_data['{{elimination_tests}}']}`,`\n<b>${lang_data['{{elimination_tests}}']}:<b>`)
-        data = data.replaceAll(/-.+?-/g,"")
-        data = data.replace(/[ ]+/g,' ')
-        data = data.replaceAll("\n ","\n")
-        data = data.replaceAll(`✔ ${lang_data['{{mark_ghost}}']}`,"")
-        data = data.replaceAll(`✗ ${lang_data['{{mark_ghost}}']}`,"")
-        data = data.replaceAll(`${lang_data['{{tell}}']}:`,`\n${lang_data['{{tell}}']}:`)
-        data = data.replaceAll(`${lang_data['{{behavior}}']}:`,`\n${lang_data['{{behavior}}']}:`)
-        data = data.replaceAll(`${lang_data['{{ability}}']}:`,`\n${lang_data['{{ability}}']}:`)
-        data = data.replaceAll(`${lang_data['{{tell}}']} (`,`\n${lang_data['{{tell}}']} (`)
-        data = data.replaceAll(`${lang_data['{{behavior}}']} (`,`\n${lang_data['{{behavior}}']} (`)
-        data = data.replaceAll(`${lang_data['{{ability}}']} (`,`\n${lang_data['{{ability}}']} (`)
-        data = data.replaceAll(`\n\n${lang_data['{{tell}}']}:`,`\n${lang_data['{{tell}}']}:`)
-        data = data.replaceAll(`\n\n${lang_data['{{behavior}}']}:`,`\n${lang_data['{{behavior}}']}:`)
-        data = data.replaceAll(`\n\n${lang_data['{{ability}}']}:`,`\n${lang_data['{{ability}}']}:`)
-        data = data.replaceAll(`\n\n${lang_data['{{tell}}']} (`,`\n${lang_data['{{tell}}']} (`)
-        data = data.replaceAll(`\n\n${lang_data['{{behavior}}']} (`,`\n${lang_data['{{behavior}}']} (`)
-        data = data.replaceAll(`\n\n${lang_data['{{ability}}']} (`,`\n${lang_data['{{ability}}']} (`)
-        data = data.replaceAll("<b>\n\n","<b>\n").trim()
-        
-
-        dlws.send(JSON.stringify({"action":"GHOSTDATA","ghost":`${ghost}|${data}`}))
-    }
-}
-
-function send_empty_data_link(){
-    if(hasDLLink){
-        dlws.send(JSON.stringify({"action":"GHOSTDATA","ghost":`None|<i>${lang_data['{{empty_data_link}}']}<i>`}))
-    }
-}
-
-function send_evidence_link(reset = false){
-    if(hasDLLink){
-        var evi_list = [];
-        for (const [key, value] of Object.entries(state['evidence'])){ 
-            evi_list.push(`${key}:${reset ? 0 : $(document.getElementById(key)).hasClass("block") ? -2 : $(document.getElementById(key).querySelector("#checkbox")).hasClass("faded") ? -1 : value}`)
-        }
-        var cur_num_evi = document.getElementById("num_evidence").value
-        cur_num_evi = ["-5","-1"].includes(cur_num_evi) || cur_num_evi.match(/[0-9]{4}-[0-9]{4}-[0-9]{4}/g) ? document.getElementById("cust_num_evidence").value : cur_num_evi
-        dlws.send(`{"action":"EVIDENCE","evidences":"${evi_list}","num_evidence":"${cur_num_evi}"}`)
-    }
-}
-
-function send_ghosts_link(reset = false){
-    if(hasDLLink){
-        var ghost_list = [];
-        for (const [key, value] of Object.entries(state['ghosts'])){ 
-            if($(document.getElementById(key)).hasClass("hidden")){
-                ghost_list.push(`${key}:${reset ? 1 : -1}:${bpm_list.includes(key) && !reset ? 1 : bpm_los_list.includes(key) ? 2 : 0}`)
-            }
-            else{
-                ghost_list.push(`${key}:${reset ? 1 :value}:${bpm_list.includes(key) && !reset  ? 1 : bpm_los_list.includes(key) ? 2 : 0}`)
-            }
-        }
-        dlws.send(`{"action":"GHOSTS","ghost":"${ghost_list}"}`)
-    }
-}
-
-function send_modifier_link(){
-    if(hasDLLink){
-        bm = $("#blood-moon-icon").hasClass("blood-moon-active") && $("#blood-moon-icon").css("display") != "none"
-        fm = $("#forest-minion-mod").text() != '0' && $("#minion-icon").css("display") != "none"
-        cm = $("#coal-icon").hasClass("coal-active") && $("#coal-icon").css("display") != "none"
-
-        if(!bm && !fm && !cm)
-            dlws.send(`{"action":"BLOODMOON","value":0}`)
-        else if(bm && !fm && !cm)
-            dlws.send(`{"action":"BLOODMOON","value":1}`)
-        else if(!bm && fm && !cm)
-            dlws.send(`{"action":"FORESTMINION","value":1}`)
-        else if(bm && fm && !cm)
-            dlws.send(`{"action":"BLOODMINION","value":1}`)
-        else if(!bm && !fm && cm)
-            dlws.send(`{"action":"COAL","value":1}`)
-        else if(bm && !fm && cm)
-            dlws.send(`{"action":"BLOODCOAL","value":1}`)
-
-        else
-            console.log("Error: Impossible modifier!")
-    }
-}
-
-function send_sanity_link(value, color){
-    if(hasDLLink){
-        dlws.send(`{"action":"SANITY","value":${value},"color":"${color}"}`)
-    }
-}
-
-function send_map_preload_link(){
-    if(hasDLLink){
-        let non_event_maps = Object.entries(all_maps).filter(([key]) => !key.endsWith('-e')).map(([, value]) => value).join('","');
-        cur_map_link = document.getElementById("map_image").style.backgroundImage.slice(4,-1).replace(/"/g,"").replace("/zn/","/zn/dl/")
-        dlws.send(`{"action":"MAPPRELOAD","message":"${cur_map_link}","list":["${Object.values(all_maps).join('","').replaceAll("/zn/","/zn/dl/")}","${non_event_maps.replaceAll(".png","_sanity.png").replaceAll(".webp","_sanity.webp").replaceAll("/zn/","/zn/dl/")}","${non_event_maps.replaceAll(".png","_temperature.png").replaceAll(".webp","_temperature.webp").replaceAll("/zn/","/zn/dl/")}"]}`)
-    }
-
-}
-
-function send_cur_map_link(){
-    if(hasDLLink){
-        cur_map_link = document.getElementById("map_image").style.backgroundImage.slice(4,-1).replace(/"/g,"").replace("/zn/","/zn/dl/")
-        dlws.send(`{"action":"MAP","message":"${cur_map_link}"}`)
-    }
-}
-
-function send_ping_link(){
-    if(hasDLLink){
-        dlws.send('{"action":"PING"}')
-    }
-}
-
-function send_data_link(){
-    if(hasDLLink && Object.keys(data_user).length > 0){
-        dlws.send(`{"action":"DISCORD","username":"${data_user.username}"}`)
-    }
-}
-
-function send_reset_link(){
-    if(hasDLLink){
-        send_ghost_link("",0)
-        send_ghosts_link(true)
-        send_evidence_link(true)
-        send_bpm_link("-","-",["50%","75%","100%","125%","150%"][parseInt($("#ghost_modifier_speed").val())])
-        send_timer_link("TIMER_VAL","0:00")
-        send_timer_link("COOLDOWN_VAL","0:00")
-        send_timer_link("HUNT_VAL","0:00")
-        send_timer_link("SOUND_VAL","0:00")
-        send_empty_data_link()
-        dlws.send('{"action":"REQUESTRESET"}')
-        dlws.send('{"action":"UNLINK"}')
-    }
-}
-
-function disconnect_link(reset = false, has_status = false, code = 1005, reason = null) {
-    console.log(`[WS] Disconnect link: code=${code}, reason=${reason}, reset=${reset}, has_status=${has_status}`);
-
-    // 🔹 Set kill_gracefully FIRST to prevent onclose from triggering reconnect
-    kill_gracefully = true;
-    connectionState = "closed";
-
-    // 🔹 Clear all reconnection & ping timers
-    clearInterval(relink_interval);
-    clearTimeout(relink_timeout);
-    clearInterval(dlws_ping);
-
-    relink_live = false;
-    reconnecting = false;
-    relink_interval = null;
-    relink_timeout = null;
-
-    // 🔹 Send KILL action before closing (only if linked & not reset)
-    if (!reset && hasDLLink && dlws && dlws.readyState === WebSocket.OPEN) {
-        try {
-            dlws.send('{"action":"KILL"}');
-        } catch (err) {
-            console.warn("[WS] Could not send KILL:", err);
-        }
-    }
-
-    // 🔹 UI Reset
-    $("#link_id_create").show();
-
-    const mquery = window.matchMedia("screen and (pointer: coarse) and (max-device-width: 600px)");
-    if (!mquery.matches && navigator.platform.toLowerCase().includes('win'))
-        $("#link_id_create_launch").show();
-
-    $("#link_id_disconnect").hide();
-
-    // 🔹 Update status / fields if not in reset mode
-    if (!reset) {
-        document.getElementById("link_id_note").innerText = `${lang_data['{{status}}']}: ${reason ? reason : lang_data['{{not_linked}}']}`;
-        document.getElementById("dllink_status").className = null;
-        document.getElementById("link_id").value = "";
-
-        // Clear link_id cookie
-        setCookie("link_id", "", -1);
-        hasDLLink = false;
-        toggleSanitySettings();
-    }
-
-    // 🔹 Close the socket (kill_gracefully already set above)
-    if (dlws && dlws.readyState !== WebSocket.CLOSED) {
-        try {
-            dlws.close(code, reason || "Graceful disconnect");
-        } catch (e) {
-            console.warn("[WS] Error closing socket:", e);
-        }
-    }
-
-    console.log("[WS] Disconnect complete");
-}
-
+// ── Journal WS send helpers ───────────────────────────────────────────────────
 
 function send_timer(force_start = false, force_stop = false){
     if(hasLink){
@@ -1312,8 +551,8 @@ function send_sound_timer(force_start = false, force_stop = false){
 
 function send_guess(ghost){
     if(hasLink){
-        ds_name = Object.keys(data_user).length > 0 ? data_user['username'] : ""
-        ds_image = Object.keys(data_user).length > 0 ? `${data_user['avatar']}`: ""
+        ds_name  = Object.keys(data_user).length > 0 ? data_user['username'] : ""
+        ds_image = Object.keys(data_user).length > 0 ? `${data_user['avatar']}` : ""
         ws.send(`{"action":"GUESS","pos":${my_pos},"ghost":"${ghost}","ds_name":"${ds_name}","ds_image":"${ds_image}"}`)
     }
 }
@@ -1327,12 +566,6 @@ function request_guess(){
 function send_ping(){
     if(hasLink){
         ws.send('{"action":"PING"}')
-    }
-}
-
-function sync_sjl_dl(){
-    if(hasDLLink && hasLink){
-        ws.send(`{"action":"SJLDLLINK","value":"${document.getElementById("link_id").value}"}`)
     }
 }
 
@@ -1370,7 +603,7 @@ function send_state() {
 function send_ml_state(){
     if (hasLink){
         var ghost_list = [];
-        for (const [key, value] of Object.entries(state['ghosts'])){ 
+        for (const [key, value] of Object.entries(state['ghosts'])){
             if($(document.getElementById(key)).hasClass("hidden")){
                 ghost_list.push(`${key}:-1:${bpm_list.includes(key)? 1 : bpm_los_list.includes(key) ? 2 : 0}`)
             }
@@ -1381,9 +614,35 @@ function send_ml_state(){
         ws.send(`{"action":"ML-GHOSTS","ghost":"${ghost_list}"}`)
 
         var evi_list = [];
-        for (const [key, value] of Object.entries(state['evidence'])){ 
+        for (const [key, value] of Object.entries(state['evidence'])){
             evi_list.push(`${key}:${$(document.getElementById(key)).hasClass("block") ? -2 : $(document.getElementById(key).querySelector("#checkbox")).hasClass("faded") ? -1 : value}`)
         }
         ws.send(`{"action":"ML-EVIDENCE","evidences":"${evi_list}"}`)
-    }   
+    }
+}
+
+// ── Desktop-link stubs (Electron IPC where useful, no-op otherwise) ───────────
+
+function open_maps() { closeAll(true,false);  showSideMenu('maps'); }
+function open_wiki() { closeAll(false,true); showSideMenu('wiki'); }
+
+function send_bpm_link()       {}
+function send_ghost_data_link(){}
+function send_ghost_tests_link(){}
+function send_empty_data_link(){}
+function send_modifier_link()  {}
+function send_map_preload_link(){}
+function send_cur_map_link()   {}
+function send_ping_link()      {}
+function send_data_link()      {}
+function send_reset_link()     {}
+
+// ── Relay timer toggle from main process hotkey to WS room ─────────────────
+if (window.electronAPI) {
+  const TIMER_WS_ACTIONS = { smudge: 'TIMER', cooldown: 'COOLDOWNTIMER', hunt: 'HUNTTIMER' };
+  window.electronAPI.onWsBroadcastTimer(({ id }) => {
+    if (hasLink && ws && TIMER_WS_ACTIONS[id]) {
+      ws.send(JSON.stringify({ action: TIMER_WS_ACTIONS[id] }));
+    }
+  });
 }
