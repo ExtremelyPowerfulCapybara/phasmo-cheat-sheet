@@ -11,8 +11,7 @@
     "appId": "net.phasmo.cheatsheet",
     "productName": "Phasmo Cheat Sheet",
     "win": {
-      "target": "nsis",
-      "icon": "icon.ico"
+      "target": "nsis"
     },
     "nsis": {
       "oneClick": false,
@@ -23,21 +22,9 @@
       "!node_modules/.cache"
     ],
     "extraResources": [
-      {
-        "from": "../",
-        "to": "frontend",
-        "filter": [
-          "**/*",
-          "!electron/**",
-          "!server/**",
-          "!.git/**",
-          "!node_modules/**"
-        ]
-      },
-      {
-        "from": "../server",
-        "to": "server"
-      }
+      { "from": "../imgs", "to": "imgs" },
+      { "from": "../assets", "to": "assets" },
+      { "from": "../lang-v10", "to": "lang-v10" }
     ]
   },
   "dependencies": {
