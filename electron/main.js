@@ -1,6 +1,7 @@
 const { app, BrowserWindow, globalShortcut, ipcMain, screen } = require('electron');
 const path = require('path');
 const fs   = require('fs');
+const state = require('./state.js');
 
 const CONFIG_PATH    = path.join(__dirname, 'config.json');
 const SHORTCUTS_PATH = path.join(__dirname, 'shortcuts.json');
@@ -14,15 +15,18 @@ const config      = loadConfig();
 const FRONTEND_URL = config.serverUrl;
 
 const DEFAULTS = {
-  toggle_timer:          'Control+Shift+T',
-  toggle_cooldown_timer: 'Control+Shift+C',
-  toggle_hunt_timer:     'Control+Shift+H',
-  toggleFilterTools:     'Control+Shift+Q',
-  bpm_clear:             'Control+Shift+X',
-  open_maps:             'Control+Shift+M',
-  open_wiki:             'Control+Shift+G',
-  closeAll:              'Control+Shift+Left',
-  force_reload:          'Control+Shift+F5',
+  toggle_timer:          '1',
+  toggle_cooldown_timer: '2',
+  toggle_hunt_timer:     '3',
+  toggle_evidence_0:     'Shift+1',
+  toggle_evidence_1:     'Shift+2',
+  toggle_evidence_2:     'Shift+3',
+  toggle_evidence_3:     'Shift+4',
+  toggle_evidence_4:     'Shift+5',
+  toggle_evidence_5:     'Shift+6',
+  toggle_evidence_6:     'Shift+7',
+  open_maps:             'M',
+  reset_all:             'Shift+R',
 };
 
 let mainWindow      = null;
@@ -43,6 +47,44 @@ function loadShortcuts() {
 function saveShortcuts(bindings) {
   try { fs.writeFileSync(SHORTCUTS_PATH, JSON.stringify(bindings, null, 2)); }
   catch (e) { console.error('[shortcuts] save failed:', e.message); }
+}
+
+// ── Helper functions ───────────────────────────────────────────────────────────
+function broadcastTimerToggle(id) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('ws-broadcast-timer', { id });
+  }
+}
+
+function execEvidenceToggle(index) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('toggle-evidence', index);
+  }
+}
+
+function execOpenMaps() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('open-maps');
+  }
+}
+
+let shortcutHandlers = {};
+
+function buildHandlers() {
+  shortcutHandlers = {
+    toggle_timer:          () => { state.toggleTimer('smudge');   broadcastTimerToggle('smudge'); },
+    toggle_cooldown_timer: () => { state.toggleTimer('cooldown'); broadcastTimerToggle('cooldown'); },
+    toggle_hunt_timer:     () => { state.toggleTimer('hunt');     broadcastTimerToggle('hunt'); },
+    toggle_evidence_0:     () => execEvidenceToggle(0),
+    toggle_evidence_1:     () => execEvidenceToggle(1),
+    toggle_evidence_2:     () => execEvidenceToggle(2),
+    toggle_evidence_3:     () => execEvidenceToggle(3),
+    toggle_evidence_4:     () => execEvidenceToggle(4),
+    toggle_evidence_5:     () => execEvidenceToggle(5),
+    toggle_evidence_6:     () => execEvidenceToggle(6),
+    open_maps:             () => execOpenMaps(),
+    reset_all:             () => state.resetAll(),
+  };
 }
 
 // ── Windows ───────────────────────────────────────────────────────────────────
@@ -81,12 +123,12 @@ function createMainWindow() {
 }
 
 function createOverlay() {
-  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  const { height } = screen.getPrimaryDisplay().workAreaSize;
 
   overlay = new BrowserWindow({
-    width:  300,
+    width:  280,
     height: height - 40,
-    x:      width - 308,
+    x:      8,
     y:      20,
     transparent:   true,
     alwaysOnTop:   true,
@@ -96,24 +138,15 @@ function createOverlay() {
     focusable:     false,
     hasShadow:     false,
     webPreferences: {
-      preload:          path.join(__dirname, 'preload.js'),
+      preload:          path.join(__dirname, 'preload-overlay.js'),
       contextIsolation: true,
       nodeIntegration:  false,
     },
   });
 
   overlay.setIgnoreMouseEvents(true);
-
-  overlay.webContents.on('did-finish-load', () => {
-    console.log('[overlay] loaded');
-    // Confirm electronAPI available in overlay
-    overlay.webContents.executeJavaScript(
-      `window.electronAPI ? 'api_defined' : 'api_undefined'`
-    ).then(r => console.log('[diag] electronAPI in overlay:', r))
-     .catch(e => console.error('[diag] overlay check failed:', e.message));
-  });
-
   overlay.loadFile(path.join(__dirname, 'overlays', 'overlay.html'));
+  overlay.webContents.on('did-finish-load', () => console.log('[overlay] loaded'));
 }
 
 function openHotkeyManager() {
@@ -141,23 +174,14 @@ function openHotkeyManager() {
 }
 
 // ── Shortcuts ─────────────────────────────────────────────────────────────────
-function exec(fn) {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.executeJavaScript(
-      `(typeof ${fn}==='function') ? ${fn}() : 'not_defined'`
-    ).then(r => { if (r === 'not_defined') console.warn('[shortcut] not found:', fn); })
-     .catch(e => console.error('[shortcut] error in', fn, e.message));
-  }
-}
-
 function applyShortcuts(bindings) {
   for (const accel of Object.values(currentBindings)) {
     try { globalShortcut.unregister(accel); } catch {}
   }
   currentBindings = {};
   for (const [fn, accel] of Object.entries(bindings)) {
-    if (!accel) continue;
-    if (globalShortcut.register(accel, () => exec(fn))) {
+    if (!accel || !shortcutHandlers[fn]) continue;
+    if (globalShortcut.register(accel, shortcutHandlers[fn])) {
       currentBindings[fn] = accel;
     } else {
       console.warn('[shortcut] failed to register:', accel, 'for', fn);
@@ -176,7 +200,7 @@ ipcMain.handle('set-shortcut', (_, { fn, accel }) => {
   if (old) { try { globalShortcut.unregister(old); } catch {} }
 
   let ok = false;
-  try { ok = globalShortcut.register(accel, () => exec(fn)); } catch {}
+  try { ok = globalShortcut.register(accel, shortcutHandlers[fn]); } catch {}
 
   if (ok) {
     currentBindings[fn] = accel;
@@ -184,9 +208,8 @@ ipcMain.handle('set-shortcut', (_, { fn, accel }) => {
     console.log(`[shortcut] ${fn}: ${old} → ${accel}`);
     return { ok: true };
   }
-  // Restore old
   if (old) {
-    try { globalShortcut.register(old, () => exec(fn)); } catch {}
+    try { globalShortcut.register(old, shortcutHandlers[fn]); } catch {}
     currentBindings[fn] = old;
   }
   return { ok: false, error: `Could not register ${accel}` };
@@ -200,27 +223,32 @@ ipcMain.handle('reset-shortcuts', () => {
 
 ipcMain.on('open-hotkey-manager', () => openHotkeyManager());
 
-// ── IPC relay — main window → overlay ────────────────────────────────────────
-function toOverlay(channel, data) {
-  if (overlay && !overlay.isDestroyed()) {
-    overlay.webContents.send(channel, data);
-  }
-}
+// ── IPC — web page → main ─────────────────────────────────────────────────────
+// Web page → main: relay evidence result to overlay
+ipcMain.on('evidence-result', (_, data) => {
+  if (overlay && !overlay.isDestroyed()) overlay.webContents.send('evidence-update', data);
+});
 
-ipcMain.on('timer-update',    (_, d) => { console.log('[ipc] timer-update',  d); toOverlay('timer-update',    d); });
-ipcMain.on('sanity-update',   (_, d) => { console.log('[ipc] sanity-update', d); toOverlay('sanity-update',   d); });
-ipcMain.on('ghost-update',    (_, d) => { toOverlay('ghost-update',    d); });
-ipcMain.on('evidence-update', (_, d) => { toOverlay('evidence-update', d); });
-ipcMain.on('ghosts-update',   (_, d) => { toOverlay('ghosts-update',   d); });
+// Web page → main: timer toggle from WS remote action
+ipcMain.on('toggle-timer', (_, id) => state.toggleTimer(id));
+
+// Web page → main: reset all from WS remote action or UI button
+ipcMain.on('reset-all', () => state.resetAll());
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
   createMainWindow();
   createOverlay();
 
-  applyShortcuts(loadShortcuts());
+  buildHandlers();
 
-  // Fixed shortcut to open hotkey manager (not configurable)
+  state.setBroadcast((channel, data) => {
+    if (overlay && !overlay.isDestroyed()) {
+      overlay.webContents.send(channel, data);
+    }
+  });
+
+  applyShortcuts(loadShortcuts());
   globalShortcut.register('Control+Shift+K', openHotkeyManager);
 
   app.on('activate', () => {
