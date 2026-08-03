@@ -6,6 +6,7 @@ electron/dist/
 
 # Local, machine-specific state (regenerated with defaults on first run)
 electron/shortcuts.json
+electron/overlay-settings.json
 
 # Fetched/cached game data (regenerate with `npm run fetch-data` in server/)
 server/data/
