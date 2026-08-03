@@ -636,6 +636,11 @@ function send_cur_map_link()   {}
 function send_ping_link()      {}
 function send_data_link()      {}
 function send_reset_link()     {}
+function send_timer_link()     {}
+function send_sanity_link()    {}
+function send_ghost_link()     {}
+function send_evidence_link()  {}
+function send_ghosts_link()    {}
 
 // ── Relay timer toggle from main process hotkey to WS room ─────────────────
 if (window.electronAPI) {

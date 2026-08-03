@@ -83,7 +83,10 @@ function buildHandlers() {
     toggle_evidence_5:     () => execEvidenceToggle(5),
     toggle_evidence_6:     () => execEvidenceToggle(6),
     open_maps:             () => execOpenMaps(),
-    reset_all:             () => state.resetAll(),
+    reset_all:             () => {
+      state.resetAll();
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('reset-all');
+    },
   };
 }
 
