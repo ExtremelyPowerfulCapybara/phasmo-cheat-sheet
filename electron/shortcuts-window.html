@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Hotkey Manager</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #0d0f14;
+    color: #cdd6e0;
+    user-select: none;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 14px 18px 10px;
+    background: #151820;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    -webkit-app-region: drag;
+  }
+  header h1 { font-size: 14px; font-weight: 600; letter-spacing: 0.3px; }
+  header .subtitle { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+
+  .table-wrap {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 14px;
+  }
+
+  table { width: 100%; border-collapse: collapse; }
+
+  th {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: rgba(255,255,255,0.35);
+    padding: 6px 10px;
+    text-align: left;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+
+  tr.row {
+    transition: background 0.1s;
+  }
+  tr.row:hover { background: rgba(255,255,255,0.04); }
+  tr.row.capturing { background: rgba(79,200,204,0.08); }
+  tr.row.error     { background: rgba(255,80,60,0.08); }
+
+  td {
+    padding: 8px 10px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  td.action { color: rgba(255,255,255,0.8); }
+  td.key    { font-family: 'Consolas', monospace; font-size: 12px; }
+
+  .badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    letter-spacing: 0.3px;
+    color: #b2d8e0;
+  }
+  .badge.pending {
+    background: rgba(79,200,204,0.15);
+    border-color: rgba(79,200,204,0.4);
+    color: #4fc;
+    animation: pulse 1s infinite;
+  }
+  .badge.err {
+    background: rgba(255,80,60,0.15);
+    border-color: rgba(255,80,60,0.4);
+    color: #f64;
+  }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+  td.edit-cell { width: 64px; text-align: center; }
+  button.edit-btn {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 4px;
+    color: rgba(255,255,255,0.5);
+    font-size: 11px;
+    padding: 3px 9px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  button.edit-btn:hover {
+    border-color: rgba(79,200,204,0.6);
+    color: #4fc;
+  }
+  button.edit-btn.cancel {
+    border-color: rgba(255,80,60,0.4);
+    color: #f96;
+  }
+
+  footer {
+    display: flex;
+    gap: 8px;
+    padding: 10px 14px;
+    background: #151820;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    flex-shrink: 0;
+    align-items: center;
+  }
+  .status { flex: 1; font-size: 11px; color: rgba(255,255,255,0.4); }
+
+  button.btn {
+    padding: 5px 14px;
+    border-radius: 5px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+  }
+  button.btn-reset {
+    background: transparent;
+    border-color: rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.5);
+  }
+  button.btn-reset:hover { border-color: #fa3; color: #fa3; }
+  button.btn-close {
+    background: rgba(79,200,204,0.15);
+    border-color: rgba(79,200,204,0.4);
+    color: #4fc;
+  }
+  button.btn-close:hover { background: rgba(79,200,204,0.25); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Hotkey Manager</h1>
+    <div class="subtitle">Click Edit, then press the new key combination</div>
+  </div>
+</header>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Action</th>
+        <th>Shortcut</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<footer>
+  <span class="status" id="status"></span>
+  <button class="btn btn-reset" id="btnReset">Reset to defaults</button>
+  <button class="btn btn-close" id="btnClose">Close</button>
+</footer>
+
+<script>
+const LABELS = {
+  toggle_timer:          'Smudge Timer',
+  toggle_cooldown_timer: 'Cooldown Timer',
+  toggle_hunt_timer:     'Hunt Timer',
+  toggle_evidence_0:     'Evidence: EMF 5',
+  toggle_evidence_1:     'Evidence: Ultraviolet',
+  toggle_evidence_2:     'Evidence: Writing',
+  toggle_evidence_3:     'Evidence: Ghost Orbs',
+  toggle_evidence_4:     'Evidence: Spirit Box',
+  toggle_evidence_5:     'Evidence: Freezing',
+  toggle_evidence_6:     'Evidence: DOTS',
+  open_maps:             'Show Maps',
+  reset_all:             'Reset All',
+};
+
+// Convert Electron accelerator to human-readable display
+function toDisplay(accel) {
+  return accel
+    .replace('Control', 'Ctrl')
+    .replace('Left',  '←')
+    .replace('Right', '→')
+    .replace('Up',    '↑')
+    .replace('Down',  '↓')
+    .split('+')
+    .join(' + ');
+}
+
+// Convert a KeyboardEvent to an Electron accelerator string.
+// Returns null for modifier-only or invalid combos.
+function eventToAccel(e) {
+  const key = e.key;
+
+  // Ignore modifier-only presses
+  if (['Control','Shift','Alt','Meta'].includes(key)) return null;
+
+  const parts = [];
+  if (e.ctrlKey)  parts.push('Control');
+  if (e.shiftKey) parts.push('Shift');
+  if (e.altKey)   parts.push('Alt');
+  if (e.metaKey)  parts.push('Meta');
+
+  // Must have at least one modifier; bare letters (no modifiers) are not allowed
+  if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) return null;
+  // Shift-only is allowed for Shift+Number evidence hotkeys
+
+  // Normalize key name
+  let k = key;
+  if (k.length === 1) k = k.toUpperCase();
+  else {
+    // Arrow keys
+    k = { ArrowLeft:'Left', ArrowRight:'Right', ArrowUp:'Up', ArrowDown:'Down' }[k] || k;
+  }
+  parts.push(k);
+  return parts.join('+');
+}
+
+let currentShortcuts = {};
+let capturingFn = null;
+
+function renderTable(shortcuts) {
+  currentShortcuts = shortcuts;
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+  for (const [fn, label] of Object.entries(LABELS)) {
+    const accel = shortcuts[fn] || '—';
+    const tr = document.createElement('tr');
+    tr.className = 'row';
+    tr.dataset.fn = fn;
+    tr.innerHTML = `
+      <td class="action">${label}</td>
+      <td class="key"><span class="badge" id="badge-${fn}">${toDisplay(accel)}</span></td>
+      <td class="edit-cell"><button class="edit-btn" id="btn-${fn}">Edit</button></td>
+    `;
+    tbody.appendChild(tr);
+
+    document.getElementById(`btn-${fn}`).addEventListener('click', () => {
+      if (capturingFn === fn) {
+        stopCapture();
+      } else {
+        startCapture(fn);
+      }
+    });
+  }
+}
+
+function startCapture(fn) {
+  if (capturingFn) stopCapture(true);
+  capturingFn = fn;
+
+  const row   = document.querySelector(`tr[data-fn="${fn}"]`);
+  const badge = document.getElementById(`badge-${fn}`);
+  const btn   = document.getElementById(`btn-${fn}`);
+
+  row.classList.add('capturing');
+  badge.textContent = 'Press keys…';
+  badge.className = 'badge pending';
+  btn.textContent = 'Cancel';
+  btn.classList.add('cancel');
+  setStatus('Press a key combination (must include at least one modifier key)');
+}
+
+function stopCapture(silent = false) {
+  if (!capturingFn) return;
+  const fn = capturingFn;
+  capturingFn = null;
+
+  const row   = document.querySelector(`tr[data-fn="${fn}"]`);
+  const badge = document.getElementById(`badge-${fn}`);
+  const btn   = document.getElementById(`btn-${fn}`);
+
+  row.classList.remove('capturing', 'error');
+  badge.className = 'badge';
+  badge.textContent = toDisplay(currentShortcuts[fn] || '—');
+  btn.textContent = 'Edit';
+  btn.classList.remove('cancel');
+  if (!silent) setStatus('');
+}
+
+function setStatus(msg, color) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.style.color = color || 'rgba(255,255,255,0.4)';
+}
+
+document.addEventListener('keydown', async (e) => {
+  if (!capturingFn) return;
+  e.preventDefault();
+
+  const accel = eventToAccel(e);
+  if (!accel) return; // modifier-only or missing modifier
+
+  const fn = capturingFn;
+  const badge = document.getElementById(`badge-${fn}`);
+  const row   = document.querySelector(`tr[data-fn="${fn}"]`);
+
+  // Optimistically update UI
+  badge.textContent = toDisplay(accel);
+  badge.className = 'badge';
+
+  stopCapture(true);
+  setStatus('Registering…');
+
+  try {
+    const result = await window.electronAPI.setShortcut(fn, accel);
+    if (result.ok) {
+      currentShortcuts[fn] = accel;
+      badge.textContent = toDisplay(accel);
+      setStatus(`Saved: ${toDisplay(accel)}`, '#4fc');
+    } else {
+      badge.className = 'badge err';
+      badge.textContent = toDisplay(currentShortcuts[fn] || '—');
+      row.classList.add('error');
+      setTimeout(() => { row.classList.remove('error'); badge.className = 'badge'; }, 1500);
+      setStatus(`Failed: ${result.error || 'could not register shortcut'}`, '#f64');
+    }
+  } catch (err) {
+    setStatus('Error: ' + err.message, '#f64');
+  }
+});
+
+document.getElementById('btnReset').addEventListener('click', async () => {
+  setStatus('Resetting…');
+  try {
+    const shortcuts = await window.electronAPI.resetShortcuts();
+    renderTable(shortcuts);
+    setStatus('Reset to defaults', '#fa3');
+  } catch (err) {
+    setStatus('Error: ' + err.message, '#f64');
+  }
+});
+
+document.getElementById('btnClose').addEventListener('click', () => {
+  window.close();
+});
+
+// Load shortcuts on open
+(async () => {
+  try {
+    const shortcuts = await window.electronAPI.getShortcuts();
+    renderTable(shortcuts);
+  } catch (err) {
+    setStatus('Failed to load shortcuts: ' + err.message, '#f64');
+  }
+})();
+</script>
+</body>
+</html>
