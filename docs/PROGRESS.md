@@ -90,7 +90,32 @@ anything involving real OS/browser input (mouse hover, click-through, focus), do
 verification as sufficient — treat it as a real open item and do a live manual pass before calling the
 work done.
 
+## 2026-08-03 session, part 2 — Packaged installer + shared server
+
+Moved from "everyone runs their own local server" to a **shared server model**: one host PC runs
+`node server.js` continuously, exposed via a Cloudflare Tunnel at `phasmo.mustardhq.dev`. Added
+`server/README.md` with clone/install/fetch-data/run steps for whoever hosts it.
+`electron/config.json`'s `serverUrl` now points at that domain instead of `localhost:3000`, so a built
+installer works for friends with zero manual config editing.
+
+Built the first real installer via `electron-builder` (`npm run dist`, NSIS target, already configured in
+`electron/package.json`). Since the main window now loads the frontend from the tunnel URL instead of local
+files, removed the old `extraResources` block that bundled the entire `frontend/`+`server/` folders into the
+package — that was dead weight under the new model.
+
+That removal broke the **overlay window**, which is a local file (`electron/overlays/overlay.html`) and
+references icons/audio via paths like `../../imgs/emf5-icon.png` and `../../assets/start.mp3` — relative to
+`electron/overlays/`, resolving to repo-root folders that only exist in dev because `electron/` sits inside
+the full checkout there. Packaged, nothing copied those folders in, so evidence icons showed as broken
+placeholders and timers had no sound. Fixed by re-adding `extraResources` for just `imgs/`, `assets/`, and
+`lang-v10/`, placed so the overlay's existing `../../` relative paths resolve correctly inside the packaged
+`resources/` folder (sibling to `app.asar`). Verified via a real install → uninstall-old-processes → rebuild →
+reinstall → relaunch cycle: icons render and timer start sound plays correctly in the packaged `.exe`.
+
+Installer currently unsigned (Windows SmartScreen will warn friends on first run — click "More info" → "Run
+anyway") and uses Electron's default icon (no `icon.ico` in the repo yet).
+
 ## To Do
-- [x] Clickable overlay (2026-08-03)
+- [ ] Custom app icon (`icon.ico`) for the installer
 - [ ] Overlay customization
 - [ ] Web UI customization
