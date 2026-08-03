@@ -147,7 +147,51 @@ Built via the full brainstorm → spec → plan → implementation workflow — 
 `docs/superpowers/specs/2026-08-03-overlay-customization-design.md` and
 `docs/superpowers/plans/2026-08-03-overlay-customization.md`.
 
+Custom app icon (`electron/icon.ico`, multi-res 16-256px) was also added this same day, generated via PIL
+from a user-provided source PNG (`electron/icon-source.png`, kept for future regeneration) and wired into
+`electron-builder`'s `win.icon`.
+
+## 2026-08-03 session, part 4 — First public release
+
+Shipped the first public installer via a GitHub Release rather than an ad-hoc file share:
+**https://github.com/ExtremelyPowerfulCapybara/phasmo-cheat-sheet/releases/tag/v1.0.0**. Tagged the commit
+(`git tag -a v1.0.0`), pushed the tag to `fork`, then `gh release create v1.0.0 <installer.exe> --notes "..."`
+with install steps for friends (download → run → click through the unsigned-installer SmartScreen warning →
+app auto-connects to `phasmo.mustardhq.dev`). Repeatable workflow for future versions: bump version if
+desired → `npm run dist` → tag → push tag → `gh release create`/`gh release upload --clobber`.
+
+## 2026-08-03 session, part 5 — Hotkey rebind
+
+Rebound the default hotkeys: evidence 1-7 moved from `Ctrl+1..7` to `Shift+1..7`; timers moved from
+`Shift+F1/F2/F3` to `Ctrl+1/2/3`. The user's original ask was for evidence on `Shift+1-7` and timers as bare,
+unmodified `1`/`2`/`3` — real-hardware testing showed bare-key global hotkeys don't work at all on Windows:
+`globalShortcut.register('1', ...)` reports success but never actually hooks the key system-wide (a bare "1"
+typed straight into Notepad instead of firing the hotkey), so timers landed on `Ctrl+1/2/3` instead. Kept the
+Hotkey Manager's "must include a modifier" validation in the capture UI to stop future bindings from silently
+looking saved while doing nothing.
+
+Also corrected a stale assumption from an earlier session that "Shift+digit is blocked entirely" on Windows —
+that turned out to be wrong; `Shift+1` through `Shift+7` register and intercept correctly. Debugging this hit
+one red herring worth remembering: an old `shortcuts.json` in `%APPDATA%\phasmo-cheat-sheet\` silently
+overrode the new code defaults on disk (`loadShortcuts()` does `Object.assign({}, DEFAULTS, saved)` — saved
+always wins), making a working `Ctrl+1` binding look broken until "Reset to defaults" was clicked in the
+Hotkey Manager to resync.
+
+## 2026-08-03 session, part 6 — Fixed orphan process on window close
+
+User asked how to close the overlay without Task Manager — turned out there was no way to, and it was a real
+bug: the overlay window is `skipTaskbar: true` + `focusable: false` + frameless, so it has no UI a user can
+close directly. Closing the main window only nulled the `mainWindow` reference; `window-all-closed` never
+fired because the overlay was still alive, so the whole app (and every registered global hotkey) kept running
+invisibly — the actual root cause behind the long-standing "kill zombie electron.exe processes" workaround
+documented earlier in this log. Fixed by calling `app.quit()` explicitly in `mainWindow`'s `closed` handler.
+Verified on real hardware: clicked the main window's X, confirmed via `Get-Process electron` that zero
+processes remained afterward (previously several persisted — main, renderer, GPU, utility, and overlay).
+
 ## To Do
-- [ ] Custom app icon (`icon.ico`) for the installer
+- [x] Custom app icon (`icon.ico`) for the installer
 - [x] Overlay customization
+- [x] GitHub Release distribution (v1.0.0)
+- [x] Default hotkey rebind (evidence Shift+1-7, timers Ctrl+1-3)
+- [x] Fix orphan process on main window close
 - [ ] Web UI customization
