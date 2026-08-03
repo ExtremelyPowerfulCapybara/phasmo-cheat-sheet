@@ -244,6 +244,19 @@ ipcMain.on('evidence-result', (_, data) => {
   else console.warn('[evidence-result] overlay not ready');
 });
 
+// Overlay → main: toggle overlay's click-through state for hover-driven interactivity
+ipcMain.on('overlay-set-interactive', (_, interactive) => {
+  if (overlay && !overlay.isDestroyed()) {
+    overlay.setIgnoreMouseEvents(!interactive, { forward: true });
+  }
+});
+
+// Overlay → main: evidence icon clicked; reuse the same path as Ctrl+1..7 hotkeys
+ipcMain.on('overlay-toggle-evidence', (_, index) => {
+  console.log('[overlay-toggle-evidence] index:', index);
+  execEvidenceToggle(index);
+});
+
 // Web page → main: timer toggle from WS remote action
 ipcMain.on('toggle-timer', (_, id) => state.toggleTimer(id));
 
