@@ -209,9 +209,13 @@ function eventToAccel(e) {
   if (e.altKey)   parts.push('Alt');
   if (e.metaKey)  parts.push('Meta');
 
-  // Must have at least one modifier; bare letters (no modifiers) are not allowed
+  // Must have at least one modifier. Electron's globalShortcut silently
+  // "succeeds" when registering a bare key (e.g. "1") but never actually
+  // hooks it system-wide — confirmed on real hardware (2026-08-03): a bare
+  // digit typed straight into another app instead of firing the hotkey.
+  // Requiring a modifier here prevents users from binding something that
+  // looks saved but does nothing.
   if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) return null;
-  // Shift-only is allowed for Shift+Number evidence hotkeys
 
   // Normalize key name
   let k = key;

@@ -25,16 +25,16 @@ const config      = loadConfig();
 const FRONTEND_URL = config.serverUrl;
 
 const DEFAULTS = {
-  toggle_timer:          'Shift+F1',
-  toggle_cooldown_timer: 'Shift+F2',
-  toggle_hunt_timer:     'Shift+F3',
-  toggle_evidence_0:     'Control+1',
-  toggle_evidence_1:     'Control+2',
-  toggle_evidence_2:     'Control+3',
-  toggle_evidence_3:     'Control+4',
-  toggle_evidence_4:     'Control+5',
-  toggle_evidence_5:     'Control+6',
-  toggle_evidence_6:     'Control+7',
+  toggle_timer:          'Control+1',
+  toggle_cooldown_timer: 'Control+2',
+  toggle_hunt_timer:     'Control+3',
+  toggle_evidence_0:     'Shift+1',
+  toggle_evidence_1:     'Shift+2',
+  toggle_evidence_2:     'Shift+3',
+  toggle_evidence_3:     'Shift+4',
+  toggle_evidence_4:     'Shift+5',
+  toggle_evidence_5:     'Shift+6',
+  toggle_evidence_6:     'Shift+7',
   open_maps:             'Control+M',
   reset_all:             'Control+Shift+X',
 };
