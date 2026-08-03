@@ -1,0 +1,29 @@
+# Caddyfile entry (add to your existing Caddyfile):
+#
+# phasmo.yourdomain.com {
+#   reverse_proxy phasmo-server:3000
+# }
+#
+# Caddy handles wss:// WebSocket upgrade automatically.
+#
+
+services:
+  phasmo-server:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    expose:
+      - "3000"
+    volumes:
+      - phasmo_data:/app/server/data
+    networks:
+      - edge
+
+networks:
+  edge:
+    external: true
+    name: edge
+
+volumes:
+  phasmo_data:
