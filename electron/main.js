@@ -151,7 +151,7 @@ function createOverlay() {
     },
   });
 
-  overlay.setIgnoreMouseEvents(true);
+  overlay.setIgnoreMouseEvents(true, { forward: true });
   overlay.loadFile(path.join(__dirname, 'overlays', 'overlay.html'));
   overlay.webContents.on('did-finish-load', () => {
     console.log('[overlay] loaded');
