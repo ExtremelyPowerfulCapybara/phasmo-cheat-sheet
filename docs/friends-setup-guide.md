@@ -33,9 +33,9 @@ Install this if you want:
 
 | Key | Action |
 |-----|--------|
-| `1` | Start / stop Smudge timer |
-| `2` | Start / stop Cooldown timer |
-| `3` | Start / stop Hunt timer |
+| `F1` | Start / stop Smudge timer |
+| `F2` | Start / stop Cooldown timer |
+| `F3` | Start / stop Hunt timer |
 | `Shift+1` | Toggle EMF Level 5 evidence |
 | `Shift+2` | Toggle Ultraviolet evidence |
 | `Shift+3` | Toggle Ghost Writing evidence |
@@ -43,7 +43,7 @@ Install this if you want:
 | `Shift+5` | Toggle Spirit Box evidence |
 | `Shift+6` | Toggle Freezing Temperatures evidence |
 | `Shift+7` | Toggle DOTS Projector evidence |
-| `M` | Show / hide maps |
+| `Shift+M` | Show / hide maps |
 | `Shift+R` | Reset all (new investigation) |
 | `Ctrl+Shift+K` | Open Hotkey Manager to rebind any key |
 
