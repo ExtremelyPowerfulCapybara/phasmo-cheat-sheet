@@ -2,6 +2,12 @@
 
 const TICK_MS = 100;
 
+// Smudge overtime: if not stopped manually, it doesn't just end — it keeps
+// counting (red, counting up) for one more full duration. spirit-warning
+// fires 8s before that overtime period ends.
+const OVERTIME_MS = 90000;
+const OVERTIME_WARNING_AT = OVERTIME_MS - 8000;
+
 const DURATIONS = {
   smudge:   90000,
   cooldown: 25000,
@@ -9,9 +15,9 @@ const DURATIONS = {
 };
 
 const timers = {
-  smudge:   { running: false, remaining: DURATIONS.smudge,   duration: DURATIONS.smudge,   interval: null },
-  cooldown: { running: false, remaining: DURATIONS.cooldown, duration: DURATIONS.cooldown, interval: null },
-  hunt:     { running: false, remaining: DURATIONS.hunt,     duration: DURATIONS.hunt,     interval: null },
+  smudge:   { running: false, remaining: DURATIONS.smudge,   duration: DURATIONS.smudge,   interval: null, overtime: false, overtimeElapsed: 0 },
+  cooldown: { running: false, remaining: DURATIONS.cooldown, duration: DURATIONS.cooldown, interval: null, overtime: false, overtimeElapsed: 0 },
+  hunt:     { running: false, remaining: DURATIONS.hunt,     duration: DURATIONS.hunt,     interval: null, overtime: false, overtimeElapsed: 0 },
 };
 
 let broadcastFn = null;
@@ -29,25 +35,82 @@ function stopTimer(id) {
   const t = timers[id];
   if (t.interval) { clearInterval(t.interval); t.interval = null; }
   t.running = false;
-  broadcast('timer-update', { id, value: formatMs(t.remaining), running: false });
+  t.overtime = false;
+  t.overtimeElapsed = 0;
+  broadcast('timer-update', { id, value: formatMs(t.remaining), running: false, overtime: false });
+}
+
+function playCountdown(id, n) {
+  broadcast('play-audio', { id, event: 'countdown', n });
 }
 
 function startTimer(id) {
   const t = timers[id];
   t.running = true;
-  broadcast('timer-update', { id, value: formatMs(t.remaining), running: true });
+  t.overtime = false;
+  broadcast('timer-update', { id, value: formatMs(t.remaining), running: true, overtime: false });
   t.interval = setInterval(() => {
-    t.remaining -= TICK_MS;
-    if (t.remaining <= 0) {
-      t.remaining = 0;
-      stopTimer(id);
-      broadcast('play-audio', { id, event: 'ended' });
+    if (t.overtime) {
+      const prevElapsed = t.overtimeElapsed;
+      t.overtimeElapsed += TICK_MS;
+      const e = t.overtimeElapsed;
+
+      if (prevElapsed < OVERTIME_WARNING_AT && e >= OVERTIME_WARNING_AT) {
+        broadcast('play-audio', { id, event: 'spirit-warning' });
+      }
+      // 5,4,3,2,1 countdown leading into the overtime's true end
+      [5, 4, 3, 2, 1].forEach(n => {
+        const at = OVERTIME_MS - n * 1000;
+        if (prevElapsed < at && e >= at) playCountdown(id, n);
+      });
+      if (e >= OVERTIME_MS) {
+        stopTimer(id);
+        broadcast('play-audio', { id, event: 'finish' });
+        return;
+      }
+      broadcast('timer-update', { id, value: formatMs(e), running: true, overtime: true });
       return;
     }
-    if (t.remaining <= 10000 && (t.remaining + TICK_MS) > 10000) {
-      broadcast('play-audio', { id, event: 'warning' });
+
+    const prevRemaining = t.remaining;
+    t.remaining -= TICK_MS;
+    const r = t.remaining;
+
+    if (r <= 0) {
+      t.remaining = 0;
+      broadcast('play-audio', { id, event: id === 'hunt' ? 'ended' : 'finish' });
+      if (id === 'smudge') {
+        t.overtime = true;
+        t.overtimeElapsed = 0;
+        broadcast('timer-update', { id, value: '0:00', running: true, overtime: true });
+        return;
+      }
+      stopTimer(id);
+      return;
     }
-    broadcast('timer-update', { id, value: formatMs(t.remaining), running: true });
+
+    if (prevRemaining > 10000 && r <= 10000) {
+      broadcast('play-audio', { id, event: id === 'cooldown' ? 'demon-cooldown' : 'warning' });
+    }
+
+    if (id === 'cooldown') {
+      // mini early boundary: 3,2,1 + ding at 5s remaining
+      [3, 2, 1].forEach(n => {
+        const at = 5000 + n * 1000;
+        if (prevRemaining > at && r <= at) playCountdown(id, n);
+      });
+      if (prevRemaining > 5000 && r <= 5000) broadcast('play-audio', { id, event: 'finish' });
+      // final countdown into the true end
+      [3, 2, 1].forEach(n => {
+        if (prevRemaining > n * 1000 && r <= n * 1000) playCountdown(id, n);
+      });
+    } else if (id === 'smudge') {
+      [5, 4, 3, 2, 1].forEach(n => {
+        if (prevRemaining > n * 1000 && r <= n * 1000) playCountdown(id, n);
+      });
+    }
+
+    broadcast('timer-update', { id, value: formatMs(r), running: true, overtime: false });
   }, TICK_MS);
 }
 
@@ -65,9 +128,11 @@ function toggleTimer(id) {
 function resetAll() {
   for (const id of Object.keys(timers)) {
     if (timers[id].interval) { clearInterval(timers[id].interval); timers[id].interval = null; }
-    timers[id].running   = false;
-    timers[id].remaining = timers[id].duration;
-    broadcast('timer-update', { id, value: formatMs(timers[id].duration), running: false });
+    timers[id].running         = false;
+    timers[id].remaining       = timers[id].duration;
+    timers[id].overtime        = false;
+    timers[id].overtimeElapsed = 0;
+    broadcast('timer-update', { id, value: formatMs(timers[id].duration), running: false, overtime: false });
   }
   broadcast('reset-all', {});
 }

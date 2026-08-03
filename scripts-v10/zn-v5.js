@@ -14,33 +14,9 @@ function checkLink(){
     return new Promise((resolve, reject) => {
         params = new URL(window.location.href).searchParams
 
-        if (params.get("id")){
-            data_link = {
-                "id":params.get("id"),
-                "username":params.get("username"),
-                "avatar":params.get("avatar"),
-                "last_linked":params.get("last_linked"),
-                "type":params.get("type")
-            }
-
-            znid = getCookie("znid")
-
-            setCookie("data_link",JSON.stringify(data_link),30)
-            fetch(`https://zero-network.net/zn/${znid}/attach/${data_link['id']}`, {method:"POST",signal: AbortSignal.timeout(6000)})
-            .then(data => {
-                window.location.href = window.location.href.split("?")[0]
-            })
-            
-        }
-
         if (params.get('journal')){
             setCookie("room_id",params.get('journal'),1)
             window.location.href = window.location.href.split("?")[0]
-        }
-
-        if (params.get('lang')){
-            lang = params.get('lang').toLowerCase()
-            setCookie("lang",lang,90)
         }
 
         if (params.get("search")){
@@ -55,90 +31,28 @@ function checkLink(){
     })
 }
 
-function heartbeat(){
-    if(znid != "no-connection-to-server"){
-        state['settings'] = JSON.stringify(user_settings)
-        fetch("https://zero-network.net/zn/"+znid,{method:"POST",Accept:"application/json",body:JSON.stringify(state),signal: AbortSignal.timeout(10000)})
-        .then(response => response.json())
-        .then(data => {
-            $("#active-users-label").text(lang_data['{{active_users}}']+ ": " + data['active_num_users'])
-        })
-        .catch(response => {
-            console.error(response)
-            $("#active-users-label").text(lang_data['{{active_users}}']+ ": -")
-        });
-    }
-    else {
-        $("#active-users-label").text(lang_data['{{active_users}}']+ ": -")
-    }
-}
+function heartbeat(){ /* removed — analytics/active-users not needed */ }
 
 function loadAllAndConnect(){
-    let loadZN = new Promise((resolve, reject) => {
-        znid = getCookie("znid")
-        pznid = getCookie("prev-znid")
-        if(znid && znid!="no-connection-to-server"){
-            $("#session").text(`C: ${znid}`)
-            $("#prev-session").text(`P: ${pznid == '' ? '-' : pznid}`)
-
-            if(znid!="no-connection-to-server"){
-                $('#room_id').val("")
-                $('#room_id').css('color',"#CCC")
-                $('#room_id').prop('disabled',false)
-                $('#room_id_create').show()
-                $('#room_id_link').show()
-                $('#link_id_create').show()
-                mquery = window.matchMedia("screen and (pointer: coarse) and (max-device-width: 600px)")
-                if(!mquery.matches && navigator.platform.toLowerCase().includes('win'))
-                    $('#link_id_create_launch').show()
-            }
-            else{
-                $('#room_id').val("Can't Connect!")
-                $('#link_id').val("Can't Connect!")
-            }
-            resolve("Loaded existing session")
+    let loadZN = new Promise((resolve) => {
+        // Generate session ID locally — no remote call needed
+        function genLocalId() {
+            var chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            var id = 'local_';
+            for (var i = 0; i < 8; i++) id += chars[Math.floor(Math.random() * chars.length)];
+            return id;
         }
-        else{
-            var id;
-            try{
-                id = JSON.parse(getCookie("data_link"))['id'];
-            } catch(Error) {
-                id = false;
-            }
-            fetch(`https://zero-network.net/zn/?lang=${lang}${id ? '&data_id='+id : ''}`,{headers:{Accept:"application/json"}, signal: AbortSignal.timeout(10000)})
-            .then(e=>e.json())
-            .then(e => {
-                znid = e.znid
-                setCookie("znid",e.znid,1)
-
-                $("#session").text(`C: ${e.znid}`)
-                $("#prev-session").text(`P: ${pznid == '' ? '-' : pznid}`)
-
-                $('#room_id').val("")
-                $('#room_id').css('color',"#CCC")
-                $('#room_id').prop('disabled',false)
-                $('#room_id_create').show()
-                $('#room_id_link').show()
-                $('#link_id_create').show()
-                mquery = window.matchMedia("screen and (pointer: coarse) and (max-device-width: 600px)")
-                if(!mquery.matches && navigator.platform.toLowerCase().includes('win'))
-                    $('#link_id_create_launch').show()
-            })
-            .then(x =>{
-                resolve("New session created")
-            })
-            .catch(response => {
-                znid = 'no-connection-to-server'
-                console.log(response)
-                console.warn("Possible latency issues!")
-                setCookie("znid","no-connection-to-server",1)
-                $('#room_id').val("Can't Connect!")
-                $('#link_id').val("Can't Connect!")
-                $("#session").text("no-connection-to-server")
-                $("#prev-session").text(`P: ${pznid == '' ? '-' : pznid}`)
-                reject("Unable to connect")
-            })
-        }
+        znid = getCookie("znid") || genLocalId();
+        setCookie("znid", znid, 1);
+        var pznid = getCookie("prev-znid");
+        $("#session").text(`C: ${znid}`)
+        $("#prev-session").text(`P: ${pznid == '' ? '-' : pznid}`)
+        $('#room_id').val("")
+        $('#room_id').css('color',"#CCC")
+        $('#room_id').prop('disabled',false)
+        $('#room_id_create').show()
+        $('#room_id_link').show()
+        resolve("Local session ready")
     })
 
     let loadData = new Promise((resolve, reject) => {
@@ -149,7 +63,7 @@ function loadAllAndConnect(){
             lang = 'en'
         }
         try{
-            fetch(`https://zero-network.net/phasmophobia/data/ghosts.json?lang=${lang}${ghost_version ? ('&version='+ghost_version) : ''}`, {cache: 'default', signal: AbortSignal.timeout(10000)})
+            fetch(`/phasmophobia/data/ghosts.json`, {cache: 'default', signal: AbortSignal.timeout(10000)})
             .then(data => data.json())
             .then(data => {
 
@@ -286,7 +200,7 @@ function loadAllAndConnect(){
     })
 
     let loadMaps = new Promise((resolve, reject) => {
-        fetch("https://zero-network.net/phasmophobia/data/maps", {cache: 'default', signal: AbortSignal.timeout(12000)})
+        fetch("/phasmophobia/data/maps", {cache: 'default', signal: AbortSignal.timeout(12000)})
         .then(data => data.json())
         .then(data => {
             var map_html = ""
@@ -321,7 +235,7 @@ function loadAllAndConnect(){
     })
 
     let loadWeekly = new Promise((resolve, reject) => {
-        fetch("https://zero-network.net/phasmophobia/data/weekly.json", {cache: 'default', signal: AbortSignal.timeout(10000)})
+        fetch("/phasmophobia/data/weekly.json", {cache: 'default', signal: AbortSignal.timeout(10000)})
         .then(data => data.json())
         .then(data => {
             weekly_data = {
@@ -371,23 +285,8 @@ function loadAllAndConnect(){
         })
     })
 
-    let loadLanguages = new Promise((resolve, reject) => {
-        fetch("https://zero-network.net/phasmophobia/languages", {cache: 'default', signal: AbortSignal.timeout(10000)})
-        .then(data => data.json())
-        .then(data => {
-            var lang_html = ""
-            for(let i = 0; i < data.length; i++){
-                lang_html += `<option value=${data[i]['url']} ${data[i]['lang'] == lang ? "selected" : ""}>${data[i]['lang_option']}</option>`
-            }
-            $("#language").html(lang_html)
-
-            resolve("Language data loaded")
-        })
-        .catch(error => {
-            console.error(error)
-            reject("Failed to load language data")
-        })
-    })
+    // Language selection removed — English only
+    let loadLanguages = Promise.resolve("English only")
     setLoading(25)
     document.getElementById("page-loading-status").innerText = "loading language data..."
     Promise.all([load_translation()])
@@ -419,16 +318,6 @@ function loadAllAndConnect(){
                                 auto_link()
                                 openWikiFromURL()
                                 loadSearch()
-                                load_partners(true)
-                                load_models()
-
-                                try{heartbeat()} catch(Error){console.warn("Possible latency issues!")}
-                                setInterval(function(){
-                                    if(!document.hidden){
-                                        try{heartbeat()} catch(Error){console.error("Heartbeat failed!")}
-                                        try{load_partners()} catch(Error){console.error("Failed to load partners!")}
-                                    }
-                                }, 300000)
                             })
                         })
                     })
@@ -469,41 +358,8 @@ function force_reload(){
     location.href = url.toString();
 }
 
-(function devToolsDetector() {
-    let devtoolsOpen = false;
+// ── Stubs for removed module (login-v1.js) ────────────────────────────────────
+// data_user is declared in wslink-v8.js
+function getLink()    { return Promise.resolve(); }
+function applyPerms() {}
 
-    function detectDevTools() {
-        return (
-            window.outerWidth - window.innerWidth > 160 ||
-            window.outerHeight - window.innerHeight > 160
-        );
-    }
-
-    function onDevToolsOpen() {
-        const blue = 'color:#5cc0ff;font-weight:bold';
-        const red = 'color:#ff5c5c;font-weight:bold';
-        const gray = 'color:#aaa';
-        const green = 'color:#5eff8d;font-weight:bold';
-
-        console.log('%c*******************************************************', blue);
-        console.log('%c[ INTRUSION DETECTED ]', red);
-        console.log('%cJust kidding! But if you\'re digging for ghost data...', gray);
-        console.log('%cWe have a real API waiting for you:', gray);
-        console.log('%c>> https://zero-network.net/developer/portal/', green);
-        console.log('%cHappy hunting 👻', gray);
-        console.log('%c*******************************************************', blue);
-    }
-
-    setInterval(() => {
-        const open = detectDevTools();
-
-        if (open && !devtoolsOpen) {
-            devtoolsOpen = true;
-            onDevToolsOpen();
-        }
-
-        if (!open && devtoolsOpen) {
-            devtoolsOpen = false;
-        }
-    }, 5000);
-})();

@@ -33,18 +33,18 @@ Install this if you want:
 
 | Key | Action |
 |-----|--------|
-| `F1` | Start / stop Smudge timer |
-| `F2` | Start / stop Cooldown timer |
-| `F3` | Start / stop Hunt timer |
-| `Shift+1` | Toggle EMF Level 5 evidence |
-| `Shift+2` | Toggle Ultraviolet evidence |
-| `Shift+3` | Toggle Ghost Writing evidence |
-| `Shift+4` | Toggle Ghost Orbs evidence |
-| `Shift+5` | Toggle Spirit Box evidence |
-| `Shift+6` | Toggle Freezing Temperatures evidence |
-| `Shift+7` | Toggle DOTS Projector evidence |
-| `Shift+M` | Show / hide maps |
-| `Shift+R` | Reset all (new investigation) |
+| `Shift+F1` | Start / stop Smudge timer |
+| `Shift+F2` | Start / stop Cooldown timer |
+| `Shift+F3` | Start / stop Hunt timer |
+| `Ctrl+1` | Toggle EMF Level 5 evidence |
+| `Ctrl+2` | Toggle Ultraviolet evidence |
+| `Ctrl+3` | Toggle Ghost Writing evidence |
+| `Ctrl+4` | Toggle Ghost Orbs evidence |
+| `Ctrl+5` | Toggle Spirit Box evidence |
+| `Ctrl+6` | Toggle Freezing Temperatures evidence |
+| `Ctrl+7` | Toggle DOTS Projector evidence |
+| `Ctrl+M` | Show / hide maps |
+| `Ctrl+Shift+X` | Reset all (new investigation) |
 | `Ctrl+Shift+K` | Open Hotkey Manager to rebind any key |
 
 ---

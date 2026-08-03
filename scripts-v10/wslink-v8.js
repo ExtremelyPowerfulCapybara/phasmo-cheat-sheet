@@ -25,8 +25,7 @@ var pos_colors = {
 
 // Globals expected by removed modules
 var data_user  = {}
-var polled     = false
-var hasDLLink  = false
+// polled and hasDLLink are declared with `let` in filter-v15.js
 
 // --------------- Override WS send (queue messages while CONNECTING)
 

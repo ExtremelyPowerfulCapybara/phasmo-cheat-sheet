@@ -27,20 +27,30 @@
              text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 2px; }
   .t-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;
              color: rgba(255,255,255,0.20); }
-  .t-value.running { color: #4fc; }
-  .t-value.ended   { color: #f64; }
+  .t-value.running  { color: #4fc; }
+  .t-value.ended    { color: #f64; }
+  .t-value.overtime { color: #f64; }
 
   /* Evidence icons */
   .evi-grid { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
   .evi-item {
     display: flex; flex-direction: column; align-items: center; gap: 2px;
-    opacity: 0.22; transition: opacity 0.15s;
+    opacity: 0.45; transition: opacity 0.15s;
   }
-  .evi-item.active { opacity: 1.0; }
   .evi-item img { width: 26px; height: 26px; filter: brightness(0) invert(1); }
-  .evi-item.active img {
+
+  /* good (confirmed present) — green */
+  .evi-item.good { opacity: 1.0; }
+  .evi-item.good img {
     filter: brightness(0) saturate(100%) invert(80%) sepia(80%)
             saturate(400%) hue-rotate(100deg) brightness(1.1);
+  }
+
+  /* bad (confirmed absent) — dim red */
+  .evi-item.bad { opacity: 0.55; }
+  .evi-item.bad img {
+    filter: brightness(0) saturate(100%) invert(30%) sepia(90%)
+            saturate(2000%) hue-rotate(340deg) brightness(0.9);
   }
   .evi-key { font-size: 8px; color: rgba(255,255,255,0.30); }
 
@@ -78,31 +88,31 @@
   <div class="evi-grid">
     <div class="evi-item" data-evi="EMF 5">
       <img src="../../imgs/emf5-icon.png" alt="EMF 5">
-      <span class="evi-key">S+1</span>
+      <span class="evi-key">^1</span>
     </div>
     <div class="evi-item" data-evi="Ultraviolet">
       <img src="../../imgs/fingerprints-icon.png" alt="UV">
-      <span class="evi-key">S+2</span>
+      <span class="evi-key">^2</span>
     </div>
     <div class="evi-item" data-evi="Writing">
       <img src="../../imgs/writing-icon.png" alt="Writing">
-      <span class="evi-key">S+3</span>
+      <span class="evi-key">^3</span>
     </div>
     <div class="evi-item" data-evi="Ghost Orbs">
       <img src="../../imgs/orbs-icon.png" alt="Orbs">
-      <span class="evi-key">S+4</span>
+      <span class="evi-key">^4</span>
     </div>
     <div class="evi-item" data-evi="Spirit Box">
       <img src="../../imgs/spirit-box-icon.png" alt="Spirit Box">
-      <span class="evi-key">S+5</span>
+      <span class="evi-key">^5</span>
     </div>
     <div class="evi-item" data-evi="Freezing">
       <img src="../../imgs/freezing-icon.png" alt="Freezing">
-      <span class="evi-key">S+6</span>
+      <span class="evi-key">^6</span>
     </div>
     <div class="evi-item" data-evi="DOTs">
       <img src="../../imgs/dots-icon.png" alt="DOTS">
-      <span class="evi-key">S+7</span>
+      <span class="evi-key">^7</span>
     </div>
   </div>
 </div>
@@ -117,17 +127,19 @@
 
 <script>
   // ── Timer display ──────────────────────────────────────────────────────────
-  function setTimer(id, value, running) {
+  function setTimer(id, value, running, overtime) {
     const el = document.getElementById('t-' + id);
     if (!el) return;
     el.textContent = value || '—';
-    el.className = 't-value' + (running ? ' running' : (value === '0:00' ? ' ended' : ''));
+    el.className = 't-value' + (overtime ? ' overtime' : running ? ' running' : (value === '0:00' ? ' ended' : ''));
   }
 
   // ── Evidence display ───────────────────────────────────────────────────────
   function setEvidence(evidence) {
     document.querySelectorAll('.evi-item').forEach(el => {
-      el.classList.toggle('active', !!(evidence && evidence[el.dataset.evi]));
+      const val = (evidence && evidence[el.dataset.evi]) || 0;
+      el.classList.toggle('good', val === 1);
+      el.classList.toggle('bad', val === -1);
     });
   }
 
@@ -152,6 +164,7 @@
   function playTone(freq, duration, type = 'sine') {
     try {
       const ctx = getAudioCtx();
+      console.log('[audio] ctx.state =', ctx.state);
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
@@ -162,11 +175,25 @@
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + duration);
-    } catch {}
+    } catch (e) { console.error('[audio] playTone failed:', e.message); }
   }
-  function handleAudio({ id, event }) {
-    if (event === 'warning') playTone(880, 0.3);   // high beep at 10s
-    if (event === 'ended')  playTone(220, 0.6, 'sawtooth'); // low buzz at 0s
+  function playAudioFile(path) {
+    try {
+      const audio = new Audio(path);
+      audio.volume = 0.8;
+      audio.play().catch(e => console.error('[audio] file playback failed:', e.message));
+    } catch (e) { console.error('[audio] file playback error:', e.message); }
+  }
+  function playVoiceLine(name) {
+    playAudioFile(`../../lang-v10/en/assets/${name}.mp3`);
+  }
+  function handleAudio({ id, event, n }) {
+    if (event === 'warning')        playTone(880, 0.3);                // high beep at 10s (hunt only)
+    if (event === 'ended')          playTone(220, 0.6, 'sawtooth');    // low buzz at 0s (hunt only)
+    if (event === 'demon-cooldown') playVoiceLine('demon_cooldown');   // replaces warning beep on cooldown
+    if (event === 'spirit-warning') playVoiceLine('spirit_smudge');    // 8s before smudge overtime ends
+    if (event === 'countdown')      playVoiceLine(String(n));          // spoken 5,4,3,2,1
+    if (event === 'finish')         playAudioFile('../../assets/finish.mp3'); // smudge/cooldown boundary ding
   }
 
   // ── Reset ──────────────────────────────────────────────────────────────────
@@ -178,9 +205,14 @@
   }
 
   // ── Wire IPC ──────────────────────────────────────────────────────────────
+  console.log('[overlay] overlayAPI available:', !!window.overlayAPI);
   if (window.overlayAPI) {
-    window.overlayAPI.onTimerUpdate(({ id, value, running }) => setTimer(id, value, running));
+    window.overlayAPI.onTimerUpdate(({ id, value, running, overtime }) => {
+      console.log('[overlay] timer-update', id, value, running, overtime);
+      setTimer(id, value, running, overtime);
+    });
     window.overlayAPI.onEvidenceUpdate(({ evidence, ghostList }) => {
+      console.log('[overlay] evidence-update', Object.keys(evidence || {}).length, 'keys');
       setEvidence(evidence);
       setGhostList(ghostList);
     });

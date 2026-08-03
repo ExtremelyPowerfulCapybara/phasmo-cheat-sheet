@@ -30,7 +30,9 @@ function sendFilterResult() {
   const EVI_KEYS = ['EMF 5', 'Ultraviolet', 'Writing', 'Ghost Orbs', 'Spirit Box', 'Freezing', 'DOTs'];
   const evidence = {};
   for (const key of EVI_KEYS) {
-    evidence[key] = (state['evidence'][key] === 1);
+    // 1 = good, -1/-2 = bad (monkey paw included), 0 = neutral
+    const val = state['evidence'][key] || 0;
+    evidence[key] = val === 1 ? 1 : (val < 0 ? -1 : 0);
   }
   const ghostList = [];
   document.querySelectorAll('.ghost_card').forEach(el => {
@@ -102,7 +104,6 @@ function toggleFilterTools(){
             $('#filter-content').removeClass('spin_hide')
             $('#tools-content').addClass('spin_show')
             $('#tools-content').toggle()
-            draw_graph(false)
         },150)
     }
 }
@@ -1493,24 +1494,6 @@ function showInfo(event){
     $("#blackout").fadeToggle(400)
 }
 
-function showVoiceInfo(event){
-    event.stopPropagation()
-    $("#voice_blockout").toggle()
-    $("#blackout_voice").fadeToggle(400)
-}
-
-function showZNDLInfo(event){
-    event.stopPropagation()
-    $("#zndl_blockout").toggle()
-    $("#blackout_zndl").fadeToggle(400)
-}
-
-function showZNTDLInfo(event){
-    event.stopPropagation()
-    $("#zntdl_blockout").toggle()
-    $("#blackout_zntdl").fadeToggle(400)
-}
-
 function showDebug(event){
     event.stopPropagation()
     if (window._flushDebugLog) window._flushDebugLog();
@@ -1578,13 +1561,6 @@ function closeAll(skip_map=false,skip_wiki=false){
     document.getElementById("links_box").style.boxShadow = "none"
     $("#links_box").removeClass("tab-open")
 
-    document.getElementById("data_link_box").style.left = (mquery.matches ? "-100%" : "0px")
-    if (!mquery.matches)
-        document.getElementById("data_link_box").style.width = lang_menu_widths[lang].width
-    document.getElementById("data_link_box").style.boxShadow = "none"
-    document.getElementById("data_link_tab").style.boxShadow = "none"
-    $("#data_link_box").removeClass("tab-open")
-
     document.getElementById("event_box").style.left = (mquery.matches ? "-100%" : "0px")
     if (!mquery.matches)
         document.getElementById("event_box").style.width = lang_menu_widths[lang].width
@@ -1611,7 +1587,6 @@ function closeAll(skip_map=false,skip_wiki=false){
 
     document.getElementById("settings_box").style.zIndex = "1"
     document.getElementById("links_box").style.zIndex = "1"
-    document.getElementById("data_link_box").style.zIndex= "1"
     document.getElementById("event_box").style.zIndex= "1"
     if (!skip_wiki) document.getElementById("wiki_box").style.zIndex= "1"
     if (!skip_map) document.getElementById("maps_box").style.zIndex= "1"
@@ -1697,11 +1672,7 @@ function showSideMenu(block, force_open=false,force_close=false){
 function showSearch(force_open=false,force_close=false){
     document.getElementById("search_bar").value = document.getElementById("search_bar").value.replace('/','')
     if ((document.getElementById("search_box").style.right == "-36px" || force_open) && !force_close){
-        document.getElementById("partner-box").style.zIndex = "9"
-        document.getElementById("language_box").style.zIndex = "9"
         document.getElementById("theme_box").style.zIndex = "9"
-        document.getElementById("z3d-box").style.zIndex = "9"
-        document.getElementById("news_box").style.zIndex = "9"
         document.getElementById("search_box").style.zIndex = "11"
         document.getElementById("search_box").style.boxShadow = "-5px 0px 10px 0px #000"
         document.getElementById("search_tab").style.boxShadow = "-5px 6px 5px -2px #000"
@@ -1722,66 +1693,9 @@ function showSearch(force_open=false,force_close=false){
     }
 }
 
-function showNews(){
-    if (document.getElementById("news_box").style.right == "-36px"){
-        document.getElementById("partner-box").style.zIndex = "9"
-        document.getElementById("search_box").style.zIndex = "9"
-        document.getElementById("language_box").style.zIndex = "9"
-        document.getElementById("theme_box").style.zIndex = "9"
-        document.getElementById("z3d-box").style.zIndex = "9"
-        document.getElementById("news_box").style.zIndex = "11"
-        document.getElementById("news_box").style.boxShadow = "-5px 0px 10px 0px #000"
-        document.getElementById("news_tab").style.boxShadow = "-5px 6px 5px -2px #000"
-        document.getElementById("news_box").style.right = "0px"
-        document.getElementById("news_box").style.width = "350px"
-        if(mquery.matches)
-            $("#menu").hide()
-        mark_feed_read()
-    }
-    else {
-        document.getElementById("news_box").style.width = "20px"
-        document.getElementById("news_box").style.right = "-36px"
-        document.getElementById("news_box").style.boxShadow = "none"
-        document.getElementById("news_tab").style.boxShadow = "none"
-        if(mquery.matches)
-            $("#menu").show()
-    }
-}
-
-function showLanguage(){
-    if (document.getElementById("language_box").style.right == "-36px"){
-        document.getElementById("partner-box").style.zIndex = "9"
-        document.getElementById("search_box").style.zIndex = "9"
-        document.getElementById("news_box").style.zIndex = "9"
-        document.getElementById("theme_box").style.zIndex = "9"
-        document.getElementById("z3d-box").style.zIndex = "9"
-        document.getElementById("language_box").style.zIndex = "11"
-        document.getElementById("language_box").style.boxShadow = "-5px 0px 10px 0px #000"
-        document.getElementById("language_tab").style.boxShadow = "-5px 6px 5px -2px #000"
-        document.getElementById("language_box").style.right = "0px"
-        document.getElementById("language_box").style.width = "220px"
-        document.getElementById("lang_blockout").style.zIndex = "10"
-        $("#lang_blockout").fadeIn(500)
-    }
-    else {
-        document.getElementById("language_box").style.width = "20px"
-        document.getElementById("language_box").style.right = "-36px"
-        document.getElementById("language_box").style.boxShadow = "none"
-        document.getElementById("language_box").style.boxShadow = "none"
-        $("#lang_blockout").fadeOut(500)
-        setTimeout(()=>{
-            document.getElementById("lang_blockout").style.zIndex = "-999"
-        },500)
-    }
-}
-
 function showTheme(){
     if (document.getElementById("theme_box").style.right == "-36px"){
-        document.getElementById("partner-box").style.zIndex = "9"
         document.getElementById("search_box").style.zIndex = "9"
-        document.getElementById("news_box").style.zIndex = "9"
-        document.getElementById("language_box").style.zIndex = "9"
-        document.getElementById("z3d-box").style.zIndex = "9"
         document.getElementById("theme_box").style.zIndex = "11"
         document.getElementById("theme_box").style.boxShadow = "-5px 0px 10px 0px #000"
         document.getElementById("theme_tab").style.boxShadow = "-5px 6px 5px -2px #000"
@@ -1799,50 +1713,6 @@ function showTheme(){
         setTimeout(()=>{
             document.getElementById("theme_blockout").style.zIndex = "-999"
         },500)
-    }
-}
-
-function show3D(){
-    if (document.getElementById("z3d-box").style.right == "-36px"){
-        document.getElementById("partner-box").style.zIndex = "9"
-        document.getElementById("search_box").style.zIndex = "9"
-        document.getElementById("language_box").style.zIndex = "9"
-        document.getElementById("theme_box").style.zIndex = "9"
-        document.getElementById("news_box").style.zIndex = "9"
-        document.getElementById("z3d-box").style.zIndex = "11"
-        document.getElementById("z3d-box").style.boxShadow = "-5px 0px 10px 0px #000"
-        document.getElementById("z3d-tab").style.boxShadow = "-5px 6px 5px -2px #000"
-        document.getElementById("z3d-box").style.right = "0px"
-        document.getElementById("z3d-box").style.width = "350px"
-        mark_feed_read()
-    }
-    else {
-        document.getElementById("z3d-box").style.width = "20px"
-        document.getElementById("z3d-box").style.right = "-36px"
-        document.getElementById("z3d-box").style.boxShadow = "none"
-        document.getElementById("z3d-box").style.boxShadow = "none"
-    }
-}
-
-function showPartner(){
-    if (document.getElementById("partner-box").style.right == "-36px"){
-        document.getElementById("z3d-box").style.zIndex = "9"
-        document.getElementById("search_box").style.zIndex = "9"
-        document.getElementById("language_box").style.zIndex = "9"
-        document.getElementById("theme_box").style.zIndex = "9"
-        document.getElementById("news_box").style.zIndex = "9"
-        document.getElementById("partner-box").style.zIndex = "11"
-        document.getElementById("partner-box").style.boxShadow = "-5px 0px 10px 0px #000"
-        document.getElementById("partner-tab").style.boxShadow = "-5px 6px 5px -2px #000"
-        document.getElementById("partner-box").style.right = "0px"
-        document.getElementById("partner-box").style.width = "350px"
-        mark_feed_read()
-    }
-    else {
-        document.getElementById("partner-box").style.width = "20px"
-        document.getElementById("partner-box").style.right = "-36px"
-        document.getElementById("partner-box").style.boxShadow = "none"
-        document.getElementById("partner-box").style.boxShadow = "none"
     }
 }
 
@@ -1909,7 +1779,6 @@ function saveSettings(reset = false){
     user_settings['coal'] = $("#coal-icon").hasClass("coal-active") ? 1 : 0
     user_settings['forest_minion'] = reset ? 0 : parseInt($("#forest-minion-mod").text())
     user_settings['blood_moon'] = $("#blood-moon-icon").hasClass("blood-moon-active") ? 1 : 0
-    user_settings['voice_prefix'] = document.getElementById("voice_prefix").checked ? 1 : 0
 
     setCookie("settings",JSON.stringify(user_settings),30)
 }
@@ -1994,7 +1863,6 @@ function loadSettings(){
     document.getElementById("keep_alive").checked = load_default('keep_alive',0) == 1;
     document.getElementById("map_event_check_box").checked = load_default('show_event_maps',0) == 1;
     document.getElementById("map-type").value = load_default('map_type','0');
-    document.getElementById("voice_prefix").checked = load_default('voice_prefix',0) == 1;
 
     // Fix for depricated
     user_settings['map'] = user_settings['map'] == "6 Tanglewood Drive" ? "tanglewood" : user_settings['map']
@@ -2021,22 +1889,6 @@ function loadSettings(){
         toggleBloodMoon(true)
     }
 
-    if ((user_settings['bpm'] ?? 0) > 0){
-        document.getElementById('input_bpm').innerHTML = `${user_settings['bpm']}<br>bpm`
-        var cms = document.getElementById("bpm_type").checked ? get_ms(user_settings['bpm']) : get_ms_exact(user_settings['bpm'])
-        document.getElementById('input_speed').innerHTML = `${cms}<br>m/s`;
-        try{
-            mark_ghosts(cms)
-        } catch(Error){
-            // Om nom nom
-        }
-        try{
-            mark_ghost_details(cms)
-        } catch(Error){
-            // Om nom nom
-        }
-    }
-
     setCookie("settings",JSON.stringify(user_settings),30)
 
     toggleDescriptions()
@@ -2049,7 +1901,6 @@ function loadSettings(){
     mute("countdown")
     mute_broadcast()
     toggleCountup()
-    toggleVoicePrefix()
     adjustOffset(0)
     setTempo()
     setSoundType()
@@ -2093,7 +1944,6 @@ function resetSettings(){
     document.getElementById("keep_alive").checked = load_default('keep_alive',0) == 1
     document.getElementById("map_event_check_box").checked = load_default('show_event_maps',0) == 1;
     document.getElementById("map-type").value = load_default('map_type','0')
-    document.getElementById("voice_prefix").checked = load_default('voice_prefix',0) == 1;
     document.getElementById("tanglewood").click()
     document.getElementById("theme").value = user_settings['theme']
     if (user_settings['coal']){
@@ -2417,10 +2267,6 @@ function changeLayout(){
     }
 }
 
-function toggleVoicePrefix(){
-    voice_prefix = document.getElementById("voice_prefix").checked
-}
-
 async function toggleKeepAlive(elem){
     if (elem.checked){
         try {
@@ -2551,19 +2397,12 @@ function reset(skip_continue_session=false){
         state['settings'] = JSON.stringify(user_settings)
         saveSettings(true)
 
-        fetch("https://zero-network.net/zn/"+znid+"/end",{method:"POST",body:JSON.stringify(state),signal: AbortSignal.timeout(2000)})
-        .then((response) => {
-            setCookie("znid",znid,-1)
-            setCookie("prev-znid",znid,30)
-            setCookie("state",JSON.stringify(state),-1)
-            location.reload()
-        })
-        .catch((response) => {
-            setCookie("znid",znid,-1)
-            setCookie("prev-znid",znid,30)
-            setCookie("state",JSON.stringify(state),-1)
-            location.reload()
-        });
+        if (window.electronAPI && window.electronAPI.resetAll) window.electronAPI.resetAll()
+
+        setCookie("znid",znid,-1)
+        setCookie("prev-znid",znid,30)
+        setCookie("state",JSON.stringify(state),-1)
+        location.reload()
     }
 }
 

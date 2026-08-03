@@ -15,18 +15,18 @@ const config      = loadConfig();
 const FRONTEND_URL = config.serverUrl;
 
 const DEFAULTS = {
-  toggle_timer:          'F1',
-  toggle_cooldown_timer: 'F2',
-  toggle_hunt_timer:     'F3',
-  toggle_evidence_0:     'Shift+1',
-  toggle_evidence_1:     'Shift+2',
-  toggle_evidence_2:     'Shift+3',
-  toggle_evidence_3:     'Shift+4',
-  toggle_evidence_4:     'Shift+5',
-  toggle_evidence_5:     'Shift+6',
-  toggle_evidence_6:     'Shift+7',
-  open_maps:             'Shift+M',
-  reset_all:             'Shift+R',
+  toggle_timer:          'Shift+F1',
+  toggle_cooldown_timer: 'Shift+F2',
+  toggle_hunt_timer:     'Shift+F3',
+  toggle_evidence_0:     'Control+1',
+  toggle_evidence_1:     'Control+2',
+  toggle_evidence_2:     'Control+3',
+  toggle_evidence_3:     'Control+4',
+  toggle_evidence_4:     'Control+5',
+  toggle_evidence_5:     'Control+6',
+  toggle_evidence_6:     'Control+7',
+  open_maps:             'Control+M',
+  reset_all:             'Control+Shift+X',
 };
 
 let mainWindow      = null;
@@ -110,6 +110,10 @@ function createMainWindow() {
     });
   }, 1500);
 
+  mainWindow.webContents.on('console-message', (_, level, msg, line, sourceId) => {
+    console.log('[main-console]', msg, `(${sourceId}:${line})`);
+  });
+
   mainWindow.webContents.on('did-finish-load', () => {
     // Verify preload injected correctly
     mainWindow.webContents.executeJavaScript(
@@ -149,7 +153,13 @@ function createOverlay() {
 
   overlay.setIgnoreMouseEvents(true);
   overlay.loadFile(path.join(__dirname, 'overlays', 'overlay.html'));
-  overlay.webContents.on('did-finish-load', () => console.log('[overlay] loaded'));
+  overlay.webContents.on('did-finish-load', () => {
+    console.log('[overlay] loaded');
+    overlay.webContents.executeJavaScript(
+      `window.overlayAPI ? 'overlayAPI_defined' : 'overlayAPI_undefined'`
+    ).then(r => console.log('[overlay] overlayAPI:', r)).catch(e => console.error('[overlay] check failed:', e.message));
+  });
+  overlay.webContents.on('console-message', (_, level, msg) => console.log('[overlay-console]', msg));
 }
 
 function openHotkeyManager() {
@@ -229,7 +239,9 @@ ipcMain.on('open-hotkey-manager', () => openHotkeyManager());
 // ── IPC — web page → main ─────────────────────────────────────────────────────
 // Web page → main: relay evidence result to overlay
 ipcMain.on('evidence-result', (_, data) => {
+  console.log('[evidence-result] received, ghosts:', data && data.ghostList && data.ghostList.length);
   if (overlay && !overlay.isDestroyed()) overlay.webContents.send('evidence-update', data);
+  else console.warn('[evidence-result] overlay not ready');
 });
 
 // Web page → main: timer toggle from WS remote action
@@ -246,8 +258,11 @@ app.whenReady().then(() => {
   buildHandlers();
 
   state.setBroadcast((channel, data) => {
+    console.log('[broadcast]', channel, JSON.stringify(data).slice(0, 80));
     if (overlay && !overlay.isDestroyed()) {
       overlay.webContents.send(channel, data);
+    } else {
+      console.warn('[broadcast] overlay not ready or destroyed');
     }
   });
 

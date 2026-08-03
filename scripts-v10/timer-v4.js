@@ -24,7 +24,6 @@ function updateMapSize(size){
     document.getElementsByClassName('hunt_size_label')[0].innerText = `${lang_data['{{map}}']}: ${["S","M","L"][map_size]}, ${lang_data['{{hunt}}']}: ${["L","M","H"][map_difficulty]}`
     document.getElementById("map_size_info").innerText = `${lang_data['{{map_size}}']}: ${lang_data[["{{small}}","{{medium}}","{{large}}"][map_size]]}`
     document.getElementById("max_num_lights").innerText = `${lang_data['{{max_lights}}']}: ${["9","8","7"][map_size]}`
-    draw_graph()
 }
 
 function updateMapDifficulty(difficulty){
@@ -39,7 +38,6 @@ function updateMapDifficulty(difficulty){
     document.getElementsByClassName('obambo_cursed_line')[0].style.left = `${(((map_hunt_lengths[map_difficulty][map_size]-cursed_hunt)*0.2)/map_hunt_lengths[map_difficulty][map_size])*100}%`
     document.getElementsByClassName('hunt_obambo_line_label')[0].style.left = `${((cursed_hunt+((map_hunt_lengths[map_difficulty][map_size]-cursed_hunt)*0.2))/map_hunt_lengths[map_difficulty][map_size])*100}%`
     document.getElementsByClassName('hunt_size_label')[0].innerText = `${lang_data['{{map}}']}: ${["S","M","L"][map_size]}, ${lang_data['{{hunt}}']}: ${["L","M","H"][map_difficulty]}`
-    draw_graph()
 }
 
 function toggleCountup(){
