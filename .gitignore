@@ -14,3 +14,10 @@ server/data/
 *.stackdump
 .DS_Store
 Thumbs.db
+
+# Unrelated local scratch files
+Docker_Caddy_Self_Hosted_Architecture_Guide.docx
+Phasmo Key1.png
+Phasmo Key2.png
+Phasmo test.png
+SETUP.md
