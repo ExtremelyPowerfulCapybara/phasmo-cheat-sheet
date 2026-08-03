@@ -1561,13 +1561,6 @@ function closeAll(skip_map=false,skip_wiki=false){
     document.getElementById("links_box").style.boxShadow = "none"
     $("#links_box").removeClass("tab-open")
 
-    document.getElementById("event_box").style.left = (mquery.matches ? "-100%" : "0px")
-    if (!mquery.matches)
-        document.getElementById("event_box").style.width = lang_menu_widths[lang].width
-    document.getElementById("event_box").style.boxShadow = "none"
-    document.getElementById("event_tab").style.boxShadow = "none"
-    $("#event_box").removeClass("tab-open")
-
     if(!skip_wiki){
         document.getElementById("wiki_box").style.left = (mquery.matches ? "-100%" : "0px")
         if (!mquery.matches)
@@ -1587,7 +1580,6 @@ function closeAll(skip_map=false,skip_wiki=false){
 
     document.getElementById("settings_box").style.zIndex = "1"
     document.getElementById("links_box").style.zIndex = "1"
-    document.getElementById("event_box").style.zIndex= "1"
     if (!skip_wiki) document.getElementById("wiki_box").style.zIndex= "1"
     if (!skip_map) document.getElementById("maps_box").style.zIndex= "1"
     tabOpen = false

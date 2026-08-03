@@ -619,44 +619,6 @@ body{
         border-radius: 0px 5px 5px 0px;
     }
 
-    #event_box{
-        position: fixed;
-        top: 0;
-        z-index: 1;
-        width: 168px;
-        height: 100dvh;
-        background-color: #313248;
-        display: flex;
-        flex-direction: column;
-        flex-wrap: nowrap;
-        align-content: stretch;
-        align-items: flex-start;
-        color: #fff;
-        padding: 5px 8px 5px 20px;
-        font-size: 14px;
-        transition: left 0.5s ease, width 0.5s ease;
-    }
-
-    #event_tab{
-        position: absolute;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        flex-direction: column;
-        width: 16px;
-        height: 90px;
-        text-align: center;
-        top: 264px;
-        right: -26px;
-        background-color: #313248;
-        padding: 5px;
-        cursor: pointer;
-        border-style: solid;
-        border-color: #ccc;
-        border-width: 1px 1px 1px 0px;
-        border-radius: 0px 5px 5px 0px;
-    }
-
     .phasmotier_info{
         text-align: center;
         font-size: 10px;
@@ -711,7 +673,7 @@ body{
         width: 16px;
         height: 90px;
         text-align: center;
-        top: 372px;
+        top: 156px;
         right: -26px;
         background-color: #313248;
         padding: 5px;
@@ -802,7 +764,7 @@ body{
         width: 16px;
         height: 90px;
         text-align: center;
-        top: 480px;
+        top: 264px;
         right: -26px;
         background-color: #313248;
         padding: 5px;
@@ -936,7 +898,7 @@ body{
 
     #theme_box{
         position: fixed;
-        top: 128px;
+        top: 41px;
         z-index: 1;
         width: 20px;
         height: 24px;
@@ -1012,27 +974,6 @@ body{
         border-radius: 5px 0px 0px 5px;
     }
 
-    #data_tab{
-        position: fixed;
-        height: 24px;
-        width: 24px;
-        z-index: 1;
-        display: flex;
-        align-items: center;
-        align-content: center;
-        justify-content: center;
-        text-align: center;
-        top: 210px;
-        right: 0px;
-        background-color: #313248;
-        padding: 5px;
-        cursor: pointer;
-        border-style: solid;
-        border-color: #ccc;
-        border-width: 1px 0px 1px 1px;
-        border-radius: 5px 0px 0px 5px;
-    }
-
     #partner-box{
         position: fixed;
         top: 0;
@@ -1077,7 +1018,7 @@ body{
         align-content: center;
         justify-content: center;
         text-align: center;
-        top: 292px;
+        top: 77px;
         right: 0px;
         background-color: #313248;
         padding: 5px;

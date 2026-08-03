@@ -188,12 +188,16 @@
     playAudioFile(`../../lang-v10/en/assets/${name}.mp3`);
   }
   function handleAudio({ id, event, n }) {
-    if (event === 'warning')        playTone(880, 0.3);                // high beep at 10s (hunt only)
-    if (event === 'ended')          playTone(220, 0.6, 'sawtooth');    // low buzz at 0s (hunt only)
-    if (event === 'demon-cooldown') playVoiceLine('demon_cooldown');   // replaces warning beep on cooldown
-    if (event === 'spirit-warning') playVoiceLine('spirit_smudge');    // 8s before smudge overtime ends
-    if (event === 'countdown')      playVoiceLine(String(n));          // spoken 5,4,3,2,1
-    if (event === 'finish')         playAudioFile('../../assets/finish.mp3'); // smudge/cooldown boundary ding
+    if (event === 'start')            playAudioFile('../../assets/start.mp3');  // timer started (all timers)
+    if (event === 'stop')             playAudioFile('../../assets/stop.mp3');   // timer manually stopped
+    if (event === 'warning')          playTone(880, 0.3);                // high beep at 10s (hunt only)
+    if (event === 'ended')            playTone(220, 0.6, 'sawtooth');    // low buzz at 0s (hunt only)
+    if (event === 'demon-cooldown')   playVoiceLine('demon_cooldown');   // replaces warning beep on cooldown
+    if (event === 'standard-cooldown')playVoiceLine('standard_cooldown');// 5s before cooldown's true end
+    if (event === 'spirit-warning')   playVoiceLine('spirit_smudge');    // 8s before smudge overtime ends
+    if (event === 'standard-smudge')  playVoiceLine('standard_smudge');  // 8s before smudge's normal end
+    if (event === 'countdown')        playVoiceLine(String(n));          // spoken 5,4,3,2,1
+    if (event === 'finish')           playAudioFile('../../assets/finish.mp3'); // smudge/cooldown boundary ding
   }
 
   // ── Reset ──────────────────────────────────────────────────────────────────

@@ -48,7 +48,6 @@
     <link rel="stylesheet" href="login-v10/login-v1.css" >
     <link rel="stylesheet" href="wiki-v10/wiki-v2.css" >
     <link rel="stylesheet" href="wiki-v10/wiki-spoiler-v1.css" >
-    <link rel="stylesheet" href="events-v10/events-v2.css" >
     <link rel="stylesheet" href="models-v10/models-v1.css" >
     <link rel="stylesheet" href="partners-v10/partners-v4.css" >
     <link rel="stylesheet" href="feed-v10/feed-v2.css" >
@@ -393,25 +392,6 @@
         </div>
     </div>
 
-    <div id="event_box" class="side-menu"style="left: -1000px;" ontouchstart="lock(event)" ontouchend="move(event,{'left': [showSideMenu,['event']]})">
-        <div id="event_tab" onclick="showSideMenu('event')" onpointerdown="tabDown(event,'event')" onpointermove="tabMove(event,'event')" onpointerup="tabEnd(event,'event')" onpointercancel="tabEnd(event,'event')">
-            <div class="tab_rotate">{{current_event}}</div>
-        </div>
-        <span class="icon" onclick="showSideMenu('event')"></span>
-        <div class="moving_content">
-            <div class="settings_title yfont white">{{current_event}}</div>
-            <div class="title_note">( '◄' {{to_close}} )</div>
-            <div class="info_block">
-                <div id="event_title">{{current_event_title}}</div>
-                <div id="event_end_date"></div>
-                <hr>
-                <div id="event_details">
-                    {{current_event_text}}
-                </div>
-            </div>
-        </div>
-    </div>
-
     <div id="wiki_box" class="side-menu" style="left: -1000px;" ontouchstart="lock(event)" ontouchend="move(event,{'left': [showSideMenu,['wiki']]})">
         <div id="wiki_tab" onclick="showSideMenu('wiki')" onpointerdown="tabDown(event,'wiki')" onpointermove="tabMove(event,'wiki')" onpointerup="tabEnd(event,'wiki')" onpointercancel="tabEnd(event,'wiki')">
             <div class="tab_rotate">{{guides}}</div>
@@ -502,12 +482,6 @@
             </div>
         </div>
     </div>
-
-    <a href="https://discord.gg/afpvC7Bf7Y" target="_blank" >
-        <div id="data_tab">
-            <img src="https://assets-global.website-files.com/6257adef93867e50d84d30e2/636e0a6cc3c481a15a141738_icon_clyde_white_RGB.png" width="21">
-        </div>
-    </a>
 
     <div id="debug_tab" style="display: none;" onclick="showDebug(event)">
         <img src="imgs/terminal.png" width="21">
@@ -843,7 +817,6 @@
         if(mquery.matches){
             document.getElementById("settings_box").style.left = "-100%";
             document.getElementById("links_box").style.left = "-100%";
-            document.getElementById("event_box").style.left = "-100%";
             document.getElementById("wiki_box").style.left = "-100%";
             document.getElementById("maps_box").style.left = "-100%";
             document.getElementById("calibrate-button").style.display = "none";
@@ -851,7 +824,6 @@
         else{
             document.getElementById("settings_box").style.left = "0px";
             document.getElementById("links_box").style.left = "0px";
-            document.getElementById("event_box").style.left = "0px";
             document.getElementById("wiki_box").style.left = "0px";
             document.getElementById("maps_box").style.left = "-388px";
         }
@@ -872,7 +844,6 @@
     <script src="models-v10/models-v1.js"></script>
     <script src="scripts-v10/zn-v5.js"></script>
     <script src="scripts-v10/search-v3.js"></script>
-    <script src="events-v10/events-v3.js"></script>
     <script src="scripts-v10/sparkles-v1.js"></script>
     <script type="module" src="https://unpkg.com/ionicons@8.0.13/dist/ionicons/ionicons.esm.js"></script>
     <script nomodule src="https://unpkg.com/ionicons@8.0.13/dist/ionicons/ionicons.js"></script>

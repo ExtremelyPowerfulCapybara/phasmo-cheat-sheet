@@ -31,12 +31,13 @@ function formatMs(ms) {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
 
-function stopTimer(id) {
+function stopTimer(id, manual = true) {
   const t = timers[id];
   if (t.interval) { clearInterval(t.interval); t.interval = null; }
   t.running = false;
   t.overtime = false;
   t.overtimeElapsed = 0;
+  if (manual) broadcast('play-audio', { id, event: 'stop' });
   broadcast('timer-update', { id, value: formatMs(t.remaining), running: false, overtime: false });
 }
 
@@ -48,6 +49,7 @@ function startTimer(id) {
   const t = timers[id];
   t.running = true;
   t.overtime = false;
+  broadcast('play-audio', { id, event: 'start' });
   broadcast('timer-update', { id, value: formatMs(t.remaining), running: true, overtime: false });
   t.interval = setInterval(() => {
     if (t.overtime) {
@@ -64,7 +66,7 @@ function startTimer(id) {
         if (prevElapsed < at && e >= at) playCountdown(id, n);
       });
       if (e >= OVERTIME_MS) {
-        stopTimer(id);
+        stopTimer(id, false);
         broadcast('play-audio', { id, event: 'finish' });
         return;
       }
@@ -85,7 +87,7 @@ function startTimer(id) {
         broadcast('timer-update', { id, value: '0:00', running: true, overtime: true });
         return;
       }
-      stopTimer(id);
+      stopTimer(id, false);
       return;
     }
 
@@ -99,12 +101,18 @@ function startTimer(id) {
         const at = 5000 + n * 1000;
         if (prevRemaining > at && r <= at) playCountdown(id, n);
       });
-      if (prevRemaining > 5000 && r <= 5000) broadcast('play-audio', { id, event: 'finish' });
+      if (prevRemaining > 5000 && r <= 5000) {
+        broadcast('play-audio', { id, event: 'finish' });
+        broadcast('play-audio', { id, event: 'standard-cooldown' });
+      }
       // final countdown into the true end
       [3, 2, 1].forEach(n => {
         if (prevRemaining > n * 1000 && r <= n * 1000) playCountdown(id, n);
       });
     } else if (id === 'smudge') {
+      if (prevRemaining > 8000 && r <= 8000) {
+        broadcast('play-audio', { id, event: 'standard-smudge' });
+      }
       [5, 4, 3, 2, 1].forEach(n => {
         if (prevRemaining > n * 1000 && r <= n * 1000) playCountdown(id, n);
       });
