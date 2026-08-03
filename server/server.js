@@ -41,6 +41,21 @@ function broadcast(room, message, exclude = null) {
   }
 }
 
+// Appends ?v=<mtime> to local <script src="..."> / <link href="....css">
+// references so Chromium/Electron re-fetch them after a deploy instead of
+// silently serving a stale cached copy (see docs/PROGRESS.md, 2026-08-03 part 7).
+function injectCacheBusting(html, dir) {
+  return html.replace(/\b(src|href)="([^"?]+\.(?:js|css))"/g, (match, attr, url) => {
+    if (/^https?:\/\//.test(url)) return match;
+    try {
+      const mtime = fs.statSync(path.join(dir, url)).mtimeMs;
+      return `${attr}="${url}?v=${Math.floor(mtime)}"`;
+    } catch {
+      return match;
+    }
+  });
+}
+
 function serveDataFile(res, filename) {
   const filePath = path.join(DATA_DIR, filename);
   fs.readFile(filePath, (err, data) => {
@@ -112,6 +127,9 @@ const server = http.createServer((req, res) => {
 
   fs.readFile(filePath, (err, data) => {
     if (err) { res.writeHead(404); res.end('Not found'); return; }
+    if (ext === '.html') {
+      data = Buffer.from(injectCacheBusting(data.toString('utf8'), path.dirname(filePath)));
+    }
     res.writeHead(200, { 'Content-Type': contentType });
     res.end(data);
   });
