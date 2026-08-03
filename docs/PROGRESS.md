@@ -60,7 +60,36 @@ Both are now tracked, with a root `.gitignore` (`node_modules/`, the machine-loc
 **Two remotes exist**: `fork` (this account's own copy) and `origin` (the original `tybayn/phasmo-cheat-sheet`
 upstream). `main` tracks `fork/main` — always push there, never to `origin`.
 
+## 2026-08-03 session — Clickable overlay
+
+Evidence icons on the overlay (`electron/overlays/overlay.html`) are now clickable, not just
+hotkey/web-UI-driven. Hover over the Evidence panel makes it briefly interactive; clicking an icon calls
+the same `execEvidenceToggle(index)` function the `Ctrl+1..7` hotkeys use, so overlay clicks and hotkeys
+are guaranteed to behave identically. Everywhere else on the overlay (timers, ghost list, background)
+stays permanently click-through.
+
+Implementation: two new `ipcMain` handlers in `electron/main.js` (`overlay-set-interactive`,
+`overlay-toggle-evidence`), two new `preload-overlay.js` methods (`setInteractive`, `toggleEvidence`), and
+`data-idx`/hover-CSS/click-listener wiring in `overlay.html`. Built via the full
+brainstorm → spec → plan → subagent-driven-development workflow (see
+`docs/superpowers/specs/2026-08-03-clickable-overlay-design.md` and
+`docs/superpowers/plans/2026-08-03-clickable-overlay.md`).
+
+**Real-hardware testing caught a bug the subagent review couldn't**: `overlay.setIgnoreMouseEvents(true)`
+(the pre-existing baseline click-through call, untouched by the plan) was missing the `{ forward: true }`
+option. Without it, mousemove never reached the overlay's renderer, so `mouseenter` never fired, so the
+panel could never flip itself interactive — clicks silently did nothing. The subagent's review only ever
+simulated DOM events (`dispatchEvent(new MouseEvent(...))`), which bypasses the OS-level click-through
+mechanism entirely and can't catch this class of bug. Fixed by adding `{ forward: true }` to that call
+(`electron/main.js` — one line). Verified end-to-end with real mouse input: hover dims the icon, click
+cycles neutral → good → bad → neutral and updates the ghost list, `Ctrl+1..7` hotkeys still work
+unaffected, and clicks outside the Evidence panel remain click-through.
+
+**Takeaway for future subagent-driven work**: when a task reviewer flags "⚠️ cannot verify from diff" for
+anything involving real OS/browser input (mouse hover, click-through, focus), don't accept simulated-event
+verification as sufficient — treat it as a real open item and do a live manual pass before calling the
+work done.
+
 ## To Do
 - [ ] Overlay customization
-- [ ] Clickable overlay
 - [ ] Web UI customization
