@@ -13,24 +13,28 @@
     --text: rgba(255,255,255,0.80); --dim: rgba(255,255,255,0.35);
     --label: rgba(255,255,255,0.30); --accent: #4fc; --bad-text: #f64;
     --empty: rgba(255,255,255,0.25); --nomatch: rgba(255,80,80,0.7);
+    --timer-idle: rgba(255,255,255,0.20);
   }
   body.theme-high-contrast {
     --bg: rgba(0,0,0,0.95); --border: rgba(255,255,255,0.35);
     --text: #ffffff; --dim: rgba(255,255,255,0.65);
     --label: rgba(255,255,255,0.60); --accent: #00eaff; --bad-text: #ff3333;
     --empty: rgba(255,255,255,0.45); --nomatch: #ff5555;
+    --timer-idle: rgba(255,255,255,0.40);
   }
   body.theme-colorblind-friendly {
     --bg: rgba(10,10,20,0.85); --border: rgba(255,255,255,0.10);
     --text: rgba(255,255,255,0.80); --dim: rgba(255,255,255,0.35);
     --label: rgba(255,255,255,0.30); --accent: #4fc; --bad-text: #ff9900;
     --empty: rgba(255,255,255,0.25); --nomatch: #ff9900;
+    --timer-idle: rgba(255,255,255,0.20);
   }
   body.theme-minimal {
     --bg: rgba(10,10,20,0.45); --border: rgba(255,255,255,0.05);
     --text: rgba(255,255,255,0.65); --dim: rgba(255,255,255,0.25);
     --label: rgba(255,255,255,0.20); --accent: #8fd; --bad-text: #c66;
     --empty: rgba(255,255,255,0.15); --nomatch: #c66;
+    --timer-idle: rgba(255,255,255,0.15);
   }
 
   .panel {
@@ -52,7 +56,7 @@
   .t-label { display: block; font-size: 9px; color: var(--dim);
              text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 2px; }
   .t-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;
-             color: var(--dim); }
+             color: var(--timer-idle); }
   .t-value.running  { color: var(--accent); }
   .t-value.ended    { color: var(--bad-text); }
   .t-value.overtime { color: var(--bad-text); }
