@@ -138,7 +138,15 @@ function createMainWindow() {
     mainWindow.focus();
   });
 
-  mainWindow.on('closed', () => { mainWindow = null; });
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+    // The overlay has no taskbar icon, no title bar, and is unfocusable —
+    // a user has no way to close it directly. Without this, closing the
+    // main window leaves the overlay (and all global hotkeys) running as
+    // an orphan process, only killable via Task Manager. Quit explicitly
+    // so closing the main window closes the whole app, as expected.
+    app.quit();
+  });
 }
 
 function createOverlay() {
