@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: transparent; overflow: hidden; user-select: none; height: 100vh; }
+  body { font-family: 'Segoe UI', sans-serif; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+
+  .panel {
+    background: rgba(10,10,20,0.85);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 8px;
+    padding: 8px 12px;
+    backdrop-filter: blur(4px);
+  }
+
+  .sec-label {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 0.7px;
+    color: rgba(255,255,255,0.30); margin-bottom: 6px;
+  }
+
+  /* Timers */
+  .timer-grid { display: flex; gap: 4px; justify-content: space-between; }
+  .timer-cell { text-align: center; flex: 1; }
+  .t-label { display: block; font-size: 9px; color: rgba(255,255,255,0.35);
+             text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 2px; }
+  .t-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;
+             color: rgba(255,255,255,0.20); }
+  .t-value.running { color: #4fc; }
+  .t-value.ended   { color: #f64; }
+
+  /* Evidence icons */
+  .evi-grid { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .evi-item {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    opacity: 0.22; transition: opacity 0.15s;
+  }
+  .evi-item.active { opacity: 1.0; }
+  .evi-item img { width: 26px; height: 26px; filter: brightness(0) invert(1); }
+  .evi-item.active img {
+    filter: brightness(0) saturate(100%) invert(80%) sepia(80%)
+            saturate(400%) hue-rotate(100deg) brightness(1.1);
+  }
+  .evi-key { font-size: 8px; color: rgba(255,255,255,0.30); }
+
+  /* Ghost list */
+  .ghost-list { display: flex; flex-direction: column; gap: 2px; }
+  .ghost { font-size: 12px; color: rgba(255,255,255,0.80); padding: 1px 0; }
+  .ghost.empty { color: rgba(255,255,255,0.25); font-size: 11px; font-style: italic; }
+  .ghost.no-match { color: rgba(255,80,80,0.7); font-style: italic; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<!-- Timers -->
+<div class="panel">
+  <div class="sec-label">Timers</div>
+  <div class="timer-grid">
+    <div class="timer-cell">
+      <span class="t-label">Smudge</span>
+      <div class="t-value" id="t-smudge">—</div>
+    </div>
+    <div class="timer-cell">
+      <span class="t-label">Cooldown</span>
+      <div class="t-value" id="t-cooldown">—</div>
+    </div>
+    <div class="timer-cell">
+      <span class="t-label">Hunt</span>
+      <div class="t-value" id="t-hunt">—</div>
+    </div>
+  </div>
+</div>
+
+<!-- Evidence -->
+<div class="panel">
+  <div class="sec-label">Evidence</div>
+  <div class="evi-grid">
+    <div class="evi-item" data-evi="EMF 5">
+      <img src="../../imgs/emf5-icon.png" alt="EMF 5">
+      <span class="evi-key">S+1</span>
+    </div>
+    <div class="evi-item" data-evi="Ultraviolet">
+      <img src="../../imgs/fingerprints-icon.png" alt="UV">
+      <span class="evi-key">S+2</span>
+    </div>
+    <div class="evi-item" data-evi="Writing">
+      <img src="../../imgs/writing-icon.png" alt="Writing">
+      <span class="evi-key">S+3</span>
+    </div>
+    <div class="evi-item" data-evi="Ghost Orbs">
+      <img src="../../imgs/orbs-icon.png" alt="Orbs">
+      <span class="evi-key">S+4</span>
+    </div>
+    <div class="evi-item" data-evi="Spirit Box">
+      <img src="../../imgs/spirit-box-icon.png" alt="Spirit Box">
+      <span class="evi-key">S+5</span>
+    </div>
+    <div class="evi-item" data-evi="Freezing">
+      <img src="../../imgs/freezing-icon.png" alt="Freezing">
+      <span class="evi-key">S+6</span>
+    </div>
+    <div class="evi-item" data-evi="DOTs">
+      <img src="../../imgs/dots-icon.png" alt="DOTS">
+      <span class="evi-key">S+7</span>
+    </div>
+  </div>
+</div>
+
+<!-- Ghost list -->
+<div class="panel">
+  <div class="sec-label">Possible Ghosts</div>
+  <div class="ghost-list" id="ghost-list">
+    <div class="ghost empty">No evidence selected</div>
+  </div>
+</div>
+
+<script>
+  // ── Timer display ──────────────────────────────────────────────────────────
+  function setTimer(id, value, running) {
+    const el = document.getElementById('t-' + id);
+    if (!el) return;
+    el.textContent = value || '—';
+    el.className = 't-value' + (running ? ' running' : (value === '0:00' ? ' ended' : ''));
+  }
+
+  // ── Evidence display ───────────────────────────────────────────────────────
+  function setEvidence(evidence) {
+    document.querySelectorAll('.evi-item').forEach(el => {
+      el.classList.toggle('active', !!(evidence && evidence[el.dataset.evi]));
+    });
+  }
+
+  // ── Ghost list display ─────────────────────────────────────────────────────
+  function setGhostList(ghostList) {
+    const list = document.getElementById('ghost-list');
+    if (!ghostList || ghostList.length === 0) {
+      list.innerHTML = '<div class="ghost no-match">No match</div>';
+      return;
+    }
+    list.innerHTML = ghostList.slice(0, 12).map(g =>
+      `<div class="ghost">${g}</div>`
+    ).join('');
+  }
+
+  // ── Audio cues (synthetic tones via Web Audio API) ─────────────────────────
+  let audioCtx = null;
+  function getAudioCtx() {
+    if (!audioCtx) audioCtx = new AudioContext();
+    return audioCtx;
+  }
+  function playTone(freq, duration, type = 'sine') {
+    try {
+      const ctx = getAudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = type;
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + duration);
+    } catch {}
+  }
+  function handleAudio({ id, event }) {
+    if (event === 'warning') playTone(880, 0.3);   // high beep at 10s
+    if (event === 'ended')  playTone(220, 0.6, 'sawtooth'); // low buzz at 0s
+  }
+
+  // ── Reset ──────────────────────────────────────────────────────────────────
+  function resetDisplay() {
+    ['smudge','cooldown','hunt'].forEach(id => setTimer(id, '—', false));
+    setEvidence({});
+    document.getElementById('ghost-list').innerHTML =
+      '<div class="ghost empty">No evidence selected</div>';
+  }
+
+  // ── Wire IPC ──────────────────────────────────────────────────────────────
+  if (window.overlayAPI) {
+    window.overlayAPI.onTimerUpdate(({ id, value, running }) => setTimer(id, value, running));
+    window.overlayAPI.onEvidenceUpdate(({ evidence, ghostList }) => {
+      setEvidence(evidence);
+      setGhostList(ghostList);
+    });
+    window.overlayAPI.onPlayAudio(handleAudio);
+    window.overlayAPI.onResetAll(resetDisplay);
+  }
+</script>
+</body>
+</html>
