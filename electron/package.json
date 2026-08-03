@@ -11,7 +11,8 @@
     "appId": "net.phasmo.cheatsheet",
     "productName": "Phasmo Cheat Sheet",
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "icon.ico"
     },
     "nsis": {
       "oneClick": false,
