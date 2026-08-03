@@ -6,7 +6,15 @@ const overlayBounds  = require('./overlay-bounds.js');
 const overlaySettingsStore = require('./overlay-settings-store.js');
 
 const CONFIG_PATH    = path.join(__dirname, 'config.json');
-const SHORTCUTS_PATH = path.join(__dirname, 'shortcuts.json');
+
+// Writable, machine-local state must live in app.getPath('userData'), not __dirname.
+// In a packaged build, __dirname resolves inside the read-only app.asar archive —
+// fs.writeFileSync there fails silently (caught by try/catch, never surfacing to the
+// user), so settings appear to save but are lost on the next launch. userData is the
+// standard Electron location for exactly this kind of generated, per-install data.
+const USER_DATA_DIR       = app.getPath('userData');
+const SHORTCUTS_PATH      = path.join(USER_DATA_DIR, 'shortcuts.json');
+const OVERLAY_SETTINGS_PATH = path.join(USER_DATA_DIR, 'overlay-settings.json');
 
 function loadConfig() {
   try { return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); }
@@ -303,7 +311,7 @@ ipcMain.handle('overlay-settings-update', (_, partial) => {
 
   const boundsAffectingChange = next.corner !== overlaySettings.corner || next.scale !== overlaySettings.scale;
   overlaySettings = next;
-  overlaySettingsStore.save(overlaySettings);
+  overlaySettingsStore.save(overlaySettings, OVERLAY_SETTINGS_PATH);
 
   if (overlay && !overlay.isDestroyed()) {
     if (boundsAffectingChange) {
@@ -326,7 +334,7 @@ ipcMain.on('reset-all', () => state.resetAll());
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
-  overlaySettings = overlaySettingsStore.load();
+  overlaySettings = overlaySettingsStore.load(OVERLAY_SETTINGS_PATH);
 
   createMainWindow();
   createOverlay();
