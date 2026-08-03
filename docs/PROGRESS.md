@@ -115,7 +115,26 @@ reinstall → relaunch cycle: icons render and timer start sound plays correctly
 Installer currently unsigned (Windows SmartScreen will warn friends on first run — click "More info" → "Run
 anyway") and uses Electron's default icon (no `icon.ico` in the repo yet).
 
+## 2026-08-03 session, part 3 — Overlay customization
+
+Added a dedicated Overlay Settings window (`Ctrl+Shift+O`), modeled on the existing Hotkey Manager, letting
+the user control the combined overlay's corner (top-left/top-right/bottom-left/bottom-right), scale
+(75%–150%), color theme (Default / High Contrast / Colorblind Friendly / Minimal), and per-panel visibility
+(Timers / Evidence / Possible Ghosts). Settings persist to `electron/overlay-settings.json` (gitignored,
+machine-local) and apply live — no restart needed, and no Save button, matching the Hotkey Manager's UX.
+
+Two new pure, unit-tested modules: `electron/overlay-bounds.js` (corner+scale → window bounds math) and
+`electron/overlay-settings-store.js` (load/save/validate the settings file, with per-field fallback to
+defaults so one bad value — e.g. hand-edited to an invalid corner — doesn't reset the whole file). The
+overlay's CSS was refactored from hardcoded colors to theme-scoped custom properties (`--bg`, `--text`,
+`--accent`, etc.) so `.theme-default` reproduces the pre-existing look exactly, with three additional theme
+blocks layered on top.
+
+Built via the full brainstorm → spec → plan → implementation workflow — see
+`docs/superpowers/specs/2026-08-03-overlay-customization-design.md` and
+`docs/superpowers/plans/2026-08-03-overlay-customization.md`.
+
 ## To Do
 - [ ] Custom app icon (`icon.ico`) for the installer
-- [ ] Overlay customization
+- [x] Overlay customization
 - [ ] Web UI customization
