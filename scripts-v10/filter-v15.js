@@ -25,6 +25,20 @@ let filter_locked = false;
 let voice_prefix = false;
 let wakeLock = null;
 
+function sendFilterResult() {
+  if (!window.electronAPI) return;
+  const EVI_KEYS = ['EMF 5', 'Ultraviolet', 'Writing', 'Ghost Orbs', 'Spirit Box', 'Freezing', 'DOTs'];
+  const evidence = {};
+  for (const key of EVI_KEYS) {
+    evidence[key] = (state['evidence'][key] === 1);
+  }
+  const ghostList = [];
+  document.querySelectorAll('.ghost_card').forEach(el => {
+    if (!el.classList.contains('hidden')) ghostList.push(el.id);
+  });
+  window.electronAPI.sendEvidenceResult({ evidence, ghostList });
+}
+
 let auto_select_timeout = null
 let last_guessed = null
 
@@ -1233,6 +1247,7 @@ function filter(ignore_link=false){
     updateScaling()
     if (hasLink && !ignore_link){send_state()}
     if (hasDLLink){send_evidence_link(); send_ghosts_link();}
+    sendFilterResult();
 }
 
 function prioritySort(){
@@ -1881,7 +1896,7 @@ function saveSettings(reset = false){
     user_settings['sound_type'] = document.getElementById("modifier_sound_type").value;
     user_settings['speed_logic_type'] = document.getElementById("speed_logic_type").checked ? 1 : 0;
     user_settings['bpm_type'] = document.getElementById("bpm_type").checked ? 1 : 0;
-    user_settings['bpm'] = reset ? 0 : parseInt(document.getElementById('input_bpm').innerHTML.split("<br>")[0])
+    user_settings['bpm'] = reset ? 0 : (document.getElementById('input_bpm') ? parseInt(document.getElementById('input_bpm').innerHTML.split("<br>")[0]) : 0)
     user_settings['domo_side'] = $("#domovoi").hasClass("domovoi-flip") ? 1 : 0;
     user_settings['priority_sort'] = document.getElementById("priority_sort").checked ? 1 : 0;
     user_settings['disable_particles'] = document.getElementById("disable_particles").checked ? 1 : 0;
@@ -2550,5 +2565,28 @@ function reset(skip_continue_session=false){
             location.reload()
         });
     }
+}
+
+// ── Electron IPC: evidence hotkeys and maps from main process ──────────────
+if (window.electronAPI) {
+  const EVIDENCE_HOTKEY_MAP = [
+    'EMF 5', 'Ultraviolet', 'Writing', 'Ghost Orbs', 'Spirit Box', 'Freezing', 'DOTs'
+  ];
+
+  window.electronAPI.onToggleEvidence((index) => {
+    const eviName = EVIDENCE_HOTKEY_MAP[index];
+    if (!eviName) return;
+    const el = document.querySelector(`[name="evidence"][value="${eviName}"]`);
+    if (el) tristate(el);
+  });
+
+  window.electronAPI.onOpenMaps(() => {
+    if (typeof closeAll === 'function') closeAll(true, false);
+    if (typeof showSideMenu === 'function') showSideMenu('maps');
+  });
+
+  window.electronAPI.onResetAll(() => {
+    if (typeof reset === 'function') reset();
+  });
 }
 
