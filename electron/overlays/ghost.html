@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: transparent; overflow: hidden; user-select: none; }
+  body { font-family: 'Segoe UI', sans-serif; padding: 8px; }
+
+  .panel {
+    background: rgba(10, 10, 20, 0.82);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    padding: 10px 12px;
+    backdrop-filter: blur(4px);
+    max-height: 580px;
+    overflow: hidden;
+  }
+
+  .header {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: rgba(255,255,255,0.35);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .count { color: rgba(255,255,255,0.6); font-weight: 600; }
+
+  .evidence-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .badge {
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.5);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .badge.active {
+    background: rgba(76,255,196,0.18);
+    color: #4fc;
+    border: 1px solid rgba(76,255,196,0.3);
+  }
+
+  .ghost-list { display: flex; flex-direction: column; gap: 3px; }
+
+  .ghost {
+    font-size: 13px;
+    color: rgba(255,255,255,0.85);
+    padding: 3px 6px;
+    border-radius: 4px;
+    border-left: 2px solid transparent;
+  }
+  .ghost.possible  { border-left-color: #4fc; }
+  .ghost.guess     { background: rgba(76,255,196,0.12); border-left-color: #4fc; font-weight: 600; color: #fff; }
+  .ghost.ruled-out { color: rgba(255,255,255,0.22); text-decoration: line-through; }
+
+  .empty { color: rgba(255,255,255,0.2); font-size: 12px; text-align: center; padding: 12px 0; }
+</style>
+</head>
+<body>
+<div class="panel">
+  <div class="header">
+    <span>Ghosts</span>
+    <span class="count" id="count"></span>
+  </div>
+  <div class="evidence-row" id="evidence"></div>
+  <div class="ghost-list" id="list"><div class="empty">No data yet</div></div>
+</div>
+
+<script>
+  const EVIDENCE_LABELS = {
+    emf5:        'EMF 5',
+    spirit_box:  'Spirit Box',
+    fingerprints:'Fingerprints',
+    ghost_orbs:  'Ghost Orbs',
+    writing:     'Writing',
+    freezing:    'Freezing',
+    dots:        'D.O.T.S',
+  };
+
+  function renderEvidence(evidence) {
+    const el = document.getElementById('evidence');
+    el.innerHTML = '';
+    for (const [key, label] of Object.entries(EVIDENCE_LABELS)) {
+      const b = document.createElement('span');
+      b.className = 'badge' + (evidence && evidence[key] ? ' active' : '');
+      b.textContent = label;
+      el.appendChild(b);
+    }
+  }
+
+  function renderGhosts(ghosts, guess) {
+    const list  = document.getElementById('list');
+    const count = document.getElementById('count');
+    if (!ghosts || ghosts.length === 0) {
+      list.innerHTML = '<div class="empty">No ghosts</div>';
+      count.textContent = '';
+      return;
+    }
+    count.textContent = ghosts.filter(g => g.possible).length + ' possible';
+    list.innerHTML = '';
+    for (const g of ghosts) {
+      const div = document.createElement('div');
+      div.className = g.name === guess ? 'ghost guess'
+                    : g.possible       ? 'ghost possible'
+                    :                    'ghost ruled-out';
+      div.textContent = g.name;
+      list.appendChild(div);
+    }
+  }
+
+  let currentGhosts   = null;
+  let currentGuess    = null;
+  let currentEvidence = null;
+
+  if (window.electronAPI) {
+    window.electronAPI.onGhostsUpdate((data) => {
+      currentGhosts = data.ghosts || data;
+      renderGhosts(currentGhosts, currentGuess);
+    });
+    window.electronAPI.onGhostUpdate((data) => {
+      currentGuess = data.ghost || data;
+      renderGhosts(currentGhosts, currentGuess);
+    });
+    window.electronAPI.onEvidenceUpdate((data) => {
+      currentEvidence = data.evidence || data;
+      renderEvidence(currentEvidence);
+    });
+  }
+</script>
+</body>
+</html>

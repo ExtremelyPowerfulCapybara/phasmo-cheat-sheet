@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: transparent; overflow: hidden; user-select: none; }
+  body { font-family: 'Segoe UI', sans-serif; padding: 8px; }
+
+  .panel {
+    background: rgba(10, 10, 20, 0.82);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    padding: 10px 14px;
+    backdrop-filter: blur(4px);
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .row:last-child { border-bottom: none; }
+
+  .label {
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    width: 72px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .timer {
+    font-size: 22px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: rgba(255,255,255,0.3);
+    min-width: 60px;
+  }
+  .timer.running { color: #4fc; }
+  .timer.warn    { color: #fa3; }
+  .timer.ended   { color: #f64; }
+</style>
+</head>
+<body>
+<div class="panel">
+  <div class="row">
+    <span class="label">Smudge</span>
+    <span class="timer" id="t-smudge">—</span>
+  </div>
+  <div class="row">
+    <span class="label">Cooldown</span>
+    <span class="timer" id="t-cool">—</span>
+  </div>
+  <div class="row">
+    <span class="label">Hunt</span>
+    <span class="timer" id="t-hunt">—</span>
+  </div>
+  <div class="row">
+    <span class="label">Sound</span>
+    <span class="timer" id="t-sound">—</span>
+  </div>
+</div>
+
+<script>
+  // data = { timer: "TIMER_VAL"|"COOLDOWN_VAL"|"HUNT_VAL"|"SOUND_VAL", value: "1:30" }
+  const MAP = {
+    TIMER_VAL:    't-smudge',
+    COOLDOWN_VAL: 't-cool',
+    HUNT_VAL:     't-hunt',
+    SOUND_VAL:    't-sound',
+  };
+
+  function setSlot(id, value) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const isZero = value === '0:00' || value === '0' || !value;
+    el.textContent = value || '—';
+    el.className   = isZero ? 'timer ended' : 'timer running';
+  }
+
+  if (window.electronAPI) {
+    window.electronAPI.onTimerUpdate((data) => {
+      if (data && data.timer) {
+        const id = MAP[data.timer.toUpperCase()];
+        if (id) setSlot(id, data.value);
+      }
+    });
+  }
+</script>
+</body>
+</html>

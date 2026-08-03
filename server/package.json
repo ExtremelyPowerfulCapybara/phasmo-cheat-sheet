@@ -1,0 +1,13 @@
+{
+  "name": "phasmo-local-server",
+  "version": "1.0.0",
+  "description": "Local WebSocket + static file server for the Phasmo Cheat Sheet fork",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "fetch-data": "node fetch-data.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

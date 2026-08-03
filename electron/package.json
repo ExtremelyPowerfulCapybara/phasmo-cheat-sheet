@@ -1,0 +1,50 @@
+{
+  "name": "phasmo-cheat-sheet",
+  "version": "1.0.0",
+  "description": "Phasmo Cheat Sheet — Electron wrapper with global hotkeys and overlays",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "net.phasmo.cheatsheet",
+    "productName": "Phasmo Cheat Sheet",
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "files": [
+      "**/*",
+      "!node_modules/.cache"
+    ],
+    "extraResources": [
+      {
+        "from": "../",
+        "to": "frontend",
+        "filter": [
+          "**/*",
+          "!electron/**",
+          "!server/**",
+          "!.git/**",
+          "!node_modules/**"
+        ]
+      },
+      {
+        "from": "../server",
+        "to": "server"
+      }
+    ]
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  }
+}

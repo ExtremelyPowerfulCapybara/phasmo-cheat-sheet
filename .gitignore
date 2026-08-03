@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Electron build output
+electron/dist/
+
+# Local, machine-specific state (regenerated with defaults on first run)
+electron/shortcuts.json
+
+# Fetched/cached game data (regenerate with `npm run fetch-data` in server/)
+server/data/
+
+# Crash dumps / OS junk
+*.stackdump
+.DS_Store
+Thumbs.db

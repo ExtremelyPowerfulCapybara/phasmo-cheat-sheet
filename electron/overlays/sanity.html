@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: transparent; overflow: hidden; user-select: none; }
+  body { font-family: 'Segoe UI', sans-serif; padding: 8px; }
+
+  .panel {
+    background: rgba(10, 10, 20, 0.82);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    padding: 10px 14px;
+    backdrop-filter: blur(4px);
+  }
+
+  .header {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: rgba(255,255,255,0.35);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .value {
+    font-size: 32px;
+    font-weight: 700;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .value span { font-size: 16px; font-weight: 400; color: rgba(255,255,255,0.4); }
+
+  .bar-track {
+    margin-top: 8px;
+    height: 6px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s ease, background 0.5s ease;
+    background: #4fc;
+  }
+</style>
+</head>
+<body>
+<div class="panel">
+  <div class="header">
+    <span>Sanity</span>
+    <span id="label">—</span>
+  </div>
+  <div class="value"><span id="pct">—</span><span>%</span></div>
+  <div class="bar-track"><div class="bar-fill" id="bar" style="width:100%"></div></div>
+</div>
+
+<script>
+  function update(pct) {
+    const p   = Math.max(0, Math.min(100, Math.round(pct)));
+    const bar = document.getElementById('bar');
+    const lbl = document.getElementById('label');
+
+    document.getElementById('pct').textContent = p;
+    bar.style.width = p + '%';
+
+    if (p > 60) {
+      bar.style.background = '#4fc';
+      lbl.textContent = 'Safe';
+      lbl.style.color = '#4fc';
+    } else if (p > 30) {
+      bar.style.background = '#fa3';
+      lbl.textContent = 'Low';
+      lbl.style.color = '#fa3';
+    } else {
+      bar.style.background = '#f64';
+      lbl.textContent = 'Critical';
+      lbl.style.color = '#f64';
+    }
+  }
+
+  if (window.electronAPI) {
+    window.electronAPI.onSanityUpdate((data) => {
+      const val = typeof data === 'number' ? data : (data.sanity ?? data.value ?? 100);
+      update(val);
+    });
+  }
+</script>
+</body>
+</html>
