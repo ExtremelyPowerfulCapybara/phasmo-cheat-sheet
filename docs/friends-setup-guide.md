@@ -24,7 +24,7 @@ Install this if you want:
 
 ### Setup steps
 
-1. **Download the app** — ask the host for the installer link
+1. **Download the app** — get the installer from the [GitHub releases page](https://github.com/ExtremelyPowerfulCapybara/phasmo-cheat-sheet/releases)
 2. **Install and open it** — the app will open the cheatsheet automatically
 3. **Configure the server** — the first time you open it, set the server URL to `https://phasmo.yourdomain.com` in the settings
 4. You're ready to go
