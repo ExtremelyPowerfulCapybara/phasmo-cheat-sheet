@@ -14,6 +14,7 @@
     <meta property="og:image" content="https://file.garden/Z-9fual_RynAMoLc/zn-logo-2.png">
     <script src="copyShare.js"></script>
     <script src="jquery/jquery-3.6.2.min.js"></script>
+    <script src="scripts-v10/api-url.js"></script>
     <script>
         if (location.search.includes('refresh=1')) {
             const cacheBuster = Date.now();
@@ -802,7 +803,7 @@
 
         (async () => {
             try {
-                const res = await fetch("/zn/health", {
+                const res = await fetch(buildApiUrl("/zn/health", window.electronAPI && window.electronAPI.serverUrl), {
                     signal: AbortSignal.timeout(5000),
                     cache: "no-store"
                 });
@@ -830,7 +831,6 @@
         if(navigator.userAgent.includes("CriOS") && (/iPad/.test(navigator.userAgent) || (navigator.platform.toLowerCase().includes('mac') && 'ontouchend' in document)))
             document.body.style.position = 'fixed';
     </script>
-    <script src="scripts-v10/api-url.js"></script>
     <script src="scripts-v10/utils-v2.js"></script>
     <script src="scripts-v10/mobile-v2.js"></script>
     <script src="lang-v10/lang-v1.js"></script>
