@@ -355,36 +355,68 @@ ipcMain.on('toggle-timer', (_, id) => state.toggleTimer(id));
 ipcMain.on('reset-all', () => state.resetAll());
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
-app.whenReady().then(() => {
-  overlaySettings = overlaySettingsStore.load(OVERLAY_SETTINGS_PATH);
 
-  createMainWindow();
-  createOverlay();
+// A second launch (e.g. a friend double-clicking the installed .exe again
+// while it's already running) would otherwise start a second full process
+// tree — its own main window, overlay, and global hotkey registrations
+// competing with the first instance's. requestSingleInstanceLock() makes the
+// second launch quit itself immediately instead; 'second-instance' fires on
+// the FIRST instance so it can refocus its own window for the user.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
-  buildHandlers();
-
-  state.setBroadcast((channel, data) => {
-    console.log('[broadcast]', channel, JSON.stringify(data).slice(0, 80));
-    if (overlay && !overlay.isDestroyed()) {
-      overlay.webContents.send(channel, data);
-    } else {
-      console.warn('[broadcast] overlay not ready or destroyed');
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
     }
   });
 
-  applyShortcuts(loadShortcuts());
-  globalShortcut.register('Control+Shift+K', openHotkeyManager);
-  globalShortcut.register('Control+Shift+O', openOverlaySettingsWindow);
+  app.whenReady().then(() => {
+    overlaySettings = overlaySettingsStore.load(OVERLAY_SETTINGS_PATH);
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
+    createMainWindow();
+    createOverlay();
+
+    buildHandlers();
+
+    state.setBroadcast((channel, data) => {
+      console.log('[broadcast]', channel, JSON.stringify(data).slice(0, 80));
+      if (overlay && !overlay.isDestroyed()) {
+        overlay.webContents.send(channel, data);
+      } else {
+        console.warn('[broadcast] overlay not ready or destroyed');
+      }
+    });
+
+    applyShortcuts(loadShortcuts());
+    globalShortcut.register('Control+Shift+K', openHotkeyManager);
+    globalShortcut.register('Control+Shift+O', openOverlaySettingsWindow);
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
+    });
   });
-});
 
-app.on('will-quit', () => {
-  globalShortcut.unregisterAll();
-});
+  // Defense-in-depth alongside mainWindow's 'closed' handler (which already
+  // calls app.quit()): if quit is ever triggered by a path that doesn't go
+  // through that handler (e.g. a future Cmd+Q/Alt+F4 handler, or an OS
+  // shutdown signal), explicitly destroy every remaining window so none of
+  // them — especially the overlay, which has no taskbar icon or way for the
+  // user to close it directly — can outlive the main process.
+  app.on('before-quit', () => {
+    for (const w of [overlay, shortcutsWindow, overlaySettingsWindow]) {
+      if (w && !w.isDestroyed()) w.destroy();
+    }
+  });
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
+  app.on('will-quit', () => {
+    globalShortcut.unregisterAll();
+  });
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
+  });
+}
