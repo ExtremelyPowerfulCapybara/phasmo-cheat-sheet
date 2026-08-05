@@ -138,6 +138,7 @@
     "{{could_not_connect}}": "Could not connect!",
     "{{not_connected}}": "Not connected",
     "{{connected}}": "Connected",
+    "{{reconnecting}}": "Reconnecting...",
     "{{timeout}}": "Timed out (1 user in room)",
     "{{not_linked}}": "Not linked",
     "{{awaiting_link}}": "Awaiting Desktop Link",

@@ -23,6 +23,19 @@ var pos_colors = {
     4:"ca36dd"
 }
 
+// ── Reconnect state ────────────────────────────────────────────────────────────
+// had_opened: this link session reached a successful onopen at least once, so a
+//   later close is a *drop* worth recovering, not just a failed initial join.
+// is_reconnecting: an auto-reconnect backoff cycle is currently in flight.
+// intentional_disconnect: set right before a deliberate ws.close() so onclose
+//   knows not to treat it as a drop and start retrying.
+let had_opened = false
+let is_reconnecting = false
+let reconnect_timer = null
+let reconnect_attempts = 0
+let intentional_disconnect = false
+const MAX_RECONNECT_ATTEMPTS = 10
+
 // Globals expected by removed modules
 var data_user  = {}
 // polled and hasDLLink are declared with `let` in filter-v15.js
@@ -164,7 +177,19 @@ function create_room(){
     });
 }
 
-function link_room(){
+function link_room(isReconnect = false){
+    if (!isReconnect){
+        // Fresh, user-intentional link attempt (button click, auto_link on load, or
+        // create_room's callback) — clear out any state left over from a previous
+        // link session so this one starts its own reconnect bookkeeping from zero.
+        clearTimeout(reconnect_timer)
+        reconnect_timer = null
+        had_opened = false
+        is_reconnecting = false
+        reconnect_attempts = 0
+        intentional_disconnect = false
+    }
+
     var room_id = document.getElementById("room_id").value
     var load_pos = getCookie("link-position")
     var proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
@@ -173,6 +198,9 @@ function link_room(){
 
     ws.onopen = function(event){
         hasLink = true;
+        had_opened = true
+        is_reconnecting = false
+        reconnect_attempts = 0
         $("#room_id_create").hide()
         $("#room_id_link").hide()
         $("#room_id_disconnect").show()
@@ -186,7 +214,61 @@ function link_room(){
     ws.onerror = function(event){
         document.getElementById("room_id_note").innerText = `${lang_data['{{error}}']}: ${lang_data['{{could_not_connect}}']}`
         document.getElementById("settings_status").className = "error"
-        setCookie("room_id","",-1)
+        if (!had_opened){
+            setCookie("room_id","",-1)
+        }
+    }
+    ws.onclose = function(event){
+        clearInterval(ws_ping)
+
+        if (intentional_disconnect){
+            // disconnect_room() already updated the UI — nothing more to do.
+            intentional_disconnect = false
+            return
+        }
+
+        if (event.code === 1008){
+            // Server rejected the room itself (not found / full / invalid) —
+            // retrying the same room id will never succeed.
+            document.getElementById("room_id_note").innerText = `${lang_data['{{error}}']}: ${event.reason || lang_data['{{could_not_connect}}']}`
+            document.getElementById("settings_status").className = "error"
+            is_reconnecting = false
+            reconnect_attempts = 0
+            hasLink = false
+            setCookie("room_id","",-1)
+            return
+        }
+
+        if (!had_opened){
+            // The very first connection attempt failed — onerror already showed
+            // the "could not connect" message. Don't start an auto-retry loop for
+            // a link that never worked in the first place.
+            return
+        }
+
+        // We had a working link and it dropped unexpectedly (network blip, tunnel
+        // idle-timeout, etc.). Try to recover it with capped exponential backoff
+        // instead of leaving the UI stuck showing a stale "Connected".
+        reconnect_attempts++
+        if (reconnect_attempts > MAX_RECONNECT_ATTEMPTS){
+            document.getElementById("room_id_note").innerText = `${lang_data['{{error}}']}: ${lang_data['{{could_not_connect}}']}`
+            document.getElementById("settings_status").className = "error"
+            is_reconnecting = false
+            reconnect_attempts = 0
+            hasLink = false
+            return
+        }
+
+        is_reconnecting = true
+        hasLink = false
+        document.getElementById("settings_status").className = "pending"
+        var reconnect_msg = lang_data['{{reconnecting}}'] || 'Reconnecting...'
+        document.getElementById("room_id_note").innerText = `${lang_data['{{status}}']}: ${reconnect_msg} (${reconnect_attempts}/${MAX_RECONNECT_ATTEMPTS})`
+
+        var delay = Math.min(30000, 1000 * Math.pow(2, reconnect_attempts - 1))
+        reconnect_timer = setTimeout(function(){
+            link_room(true)
+        }, delay)
     }
     ws.onmessage = function(event) {
         try {
@@ -499,6 +581,11 @@ function continue_session(){
 }
 
 function disconnect_room(reset=false,has_status=false){
+    intentional_disconnect = true
+    clearTimeout(reconnect_timer)
+    reconnect_timer = null
+    is_reconnecting = false
+    reconnect_attempts = 0
     ws.close()
     $(document.getElementById("link_pos")).hide()
     try { document.getElementById(`guess_pos_1`).remove()} catch (error) {}
