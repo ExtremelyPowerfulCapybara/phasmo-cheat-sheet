@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain, screen, dialog } = require('electron');
 const path = require('path');
 const fs   = require('fs');
 const state = require('./state.js');
@@ -22,7 +22,16 @@ function loadConfig() {
 }
 
 const config      = loadConfig();
-const FRONTEND_URL = config.serverUrl;
+
+// In dev, the frontend (index.html, scripts-v10/, etc.) lives at the repo
+// root, one level above electron/. In a packaged build it's copied into
+// resources/ via electron-builder's extraResources (see Task 6) — the same
+// mechanism already used for imgs/assets/lang-v10 since the 2026-08-03
+// packaged-persistence fix. This keeps "where do bundled files live" in one
+// place instead of scattering __dirname/resourcesPath checks around.
+function resolveFrontendRoot() {
+  return app.isPackaged ? process.resourcesPath : path.join(__dirname, '..');
+}
 
 const DEFAULTS = {
   toggle_timer:          'Control+1',
@@ -109,18 +118,23 @@ function createMainWindow() {
     height: 900,
     title:  'Phasmo Cheat Sheet',
     webPreferences: {
-      preload:          path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration:  false,
+      preload:            path.join(__dirname, 'preload.js'),
+      contextIsolation:   true,
+      nodeIntegration:    false,
+      additionalArguments: [`--server-url=${config.serverUrl}`],
     },
   });
 
-  // Give the Node server ~1.5 s to start
-  setTimeout(() => {
-    mainWindow.loadURL(FRONTEND_URL).catch(() => {
-      setTimeout(() => mainWindow.loadURL(FRONTEND_URL).catch(console.error), 1000);
-    });
-  }, 1500);
+  const indexPath = path.join(resolveFrontendRoot(), 'index.html');
+  mainWindow.loadFile(indexPath).catch((err) => {
+    // Bundled files missing/corrupted is a real failure mode for a packaged
+    // install (see design doc "Error Handling") — show it instead of leaving
+    // a blank window with no clue why, which was the old loadURL failure mode.
+    dialog.showErrorBox(
+      'Phasmo Cheat Sheet — failed to load',
+      `Could not load the app UI from:\n${indexPath}\n\n${err.message}`
+    );
+  });
 
   mainWindow.webContents.on('console-message', (_, level, msg, line, sourceId) => {
     console.log('[main-console]', msg, `(${sourceId}:${line})`);
