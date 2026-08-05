@@ -165,7 +165,7 @@ function create_room(){
             "ghost_modifier":parseInt(document.getElementById("ghost_modifier_speed").value)
         }
     }
-    fetch(`/create-room`,{method:"POST",Accept:"application/json",body:JSON.stringify(outgoing_state),signal: AbortSignal.timeout(6000)})
+    fetch(buildApiUrl(`/create-room`, window.electronAPI && window.electronAPI.serverUrl),{method:"POST",Accept:"application/json",body:JSON.stringify(outgoing_state),signal: AbortSignal.timeout(6000)})
     .then(response => response.json())
     .then(data => {
         var room_id = data['room_id']
@@ -192,8 +192,9 @@ function link_room(isReconnect = false){
 
     var room_id = document.getElementById("room_id").value
     var load_pos = getCookie("link-position")
-    var proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    ws = new WebSocket(`${proto}://${window.location.host}/room/${room_id}${load_pos ? '?pos='+load_pos : ''}`);
+    var roomPath = `/room/${room_id}${load_pos ? '?pos='+load_pos : ''}`
+    var fallbackOrigin = `${window.location.protocol}//${window.location.host}`
+    ws = new WebSocket(buildWsUrl(roomPath, window.electronAPI && window.electronAPI.serverUrl, fallbackOrigin));
     setCookie("room_id",room_id,1)
 
     ws.onopen = function(event){
