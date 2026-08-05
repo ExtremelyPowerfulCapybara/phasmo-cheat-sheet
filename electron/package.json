@@ -23,9 +23,20 @@
       "!node_modules/.cache"
     ],
     "extraResources": [
-      { "from": "../imgs", "to": "imgs" },
-      { "from": "../assets", "to": "assets" },
-      { "from": "../lang-v10", "to": "lang-v10" }
+      { "from": "../index.html",   "to": "index.html" },
+      { "from": "../copyShare.js", "to": "copyShare.js" },
+      { "from": "../jquery",       "to": "jquery" },
+      { "from": "../scripts-v10",  "to": "scripts-v10" },
+      { "from": "../styles-v10",   "to": "styles-v10" },
+      { "from": "../themes-v10",   "to": "themes-v10" },
+      { "from": "../login-v10",    "to": "login-v10" },
+      { "from": "../wiki-v10",     "to": "wiki-v10" },
+      { "from": "../models-v10",   "to": "models-v10" },
+      { "from": "../partners-v10", "to": "partners-v10" },
+      { "from": "../feed-v10",     "to": "feed-v10" },
+      { "from": "../imgs",         "to": "imgs" },
+      { "from": "../assets",       "to": "assets" },
+      { "from": "../lang-v10",     "to": "lang-v10" }
     ]
   },
   "dependencies": {
