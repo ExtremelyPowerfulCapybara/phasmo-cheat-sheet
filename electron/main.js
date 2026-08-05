@@ -1,4 +1,5 @@
 const { app, BrowserWindow, globalShortcut, ipcMain, screen, dialog } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs   = require('fs');
 const state = require('./state.js');
@@ -394,6 +395,13 @@ if (!gotSingleInstanceLock) {
     applyShortcuts(loadShortcuts());
     globalShortcut.register('Control+Shift+K', openHotkeyManager);
     globalShortcut.register('Control+Shift+O', openOverlaySettingsWindow);
+
+    // Checks the GitHub Releases feed independently of the relay server —
+    // failures (no network, GitHub unreachable) are swallowed so a broken
+    // update check never blocks the app from starting normally.
+    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+      console.warn('[autoUpdater] check failed:', err.message);
+    });
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
