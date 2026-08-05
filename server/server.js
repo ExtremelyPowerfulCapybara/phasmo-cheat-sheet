@@ -156,10 +156,13 @@ wss.on('connection', (ws, req) => {
   room.clients.set(ws, { pos, ready: false });
   console.log(`[room] ${roomId} pos${pos} joined (${room.clients.size}/4)`);
 
-  // Protocol handshake
+  // Protocol handshake. The trailing sentinel is a raw, unquoted "-" text
+  // frame (not JSON) — the client compares event.data == "-" before trying
+  // to JSON.parse it, so wrapping it in quotes here would send a 3-char
+  // JSON string that never matches, permanently blocking state_received.
   ws.send(JSON.stringify({ setpos: pos }));
   if (room.state) ws.send(JSON.stringify(room.state));
-  ws.send('"-"');
+  ws.send('-');
 
   ws.on('message', (raw) => {
     const text = raw.toString();

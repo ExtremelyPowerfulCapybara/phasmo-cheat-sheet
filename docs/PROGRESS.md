@@ -68,6 +68,44 @@ report that started this whole multi-session effort. Flagged as background task 
 investigation notes (root cause hypotheses, exact file:line references, repro steps) for a dedicated
 follow-up session — not fixed here, to keep this project's diff scoped to bundling/packaging/lifecycle.
 
+## 2026-08-05 session (continued) — Journal sync deadlock, fixed
+
+Picked up `task_dd8f5327`. Live-reproduced the sync failure with two real browser tabs against the local
+relay server (via the Claude-in-Chrome browser tools) instead of guessing from code alone, per
+`superpowers:systematic-debugging`. Found the ACTUAL root cause was one level deeper than either bug listed
+above, and that bug 2 above ("live updates don't render without reload") does not exist as an independent
+defect — it doesn't reproduce once the real root cause is fixed.
+
+**Real root cause**: `server/server.js`'s WS handshake sent the sentinel as `ws.send('"-"')` — a JSON-quoted
+3-character string (`"`, `-`, `"`). The client's check in `wslink-v8.js` (`if(event.data == "-")`) compares
+against the bare 1-character string and never matches (confirmed by instrumenting the raw WS frames in a live
+tab: `{"data":"\"-\"","len":3,"codes":[34,45,34]}`). Execution fell through to `JSON.parse(event.data)`,
+producing the JS string `-`, which then hit the final `else` branch and threw
+`TypeError: Cannot read properties of undefined (reading 'num_evidences')` — caught by a try/catch, so
+`state_received` was silently never set `true` for a room's first client (no `room.state` exists yet to take
+the working object-parsing path instead). This is a bug in the *local* relay server this project wrote to
+replace zero-network.net — the client-side `== "-"` check is original code, unchanged since the very first
+commit (`9faa382`), so the server was the thing not honoring its own protocol.
+
+Separately, `map_loaded` (bug 1 above) really was also a genuine bug, and both bugs independently deadlock a
+brand-new room's first client — fixing only one still leaves it stuck. Fix: `map_loaded` now gets set `true`
+once the client's own map data has finished loading (`zn-v5.js`, right after
+`Promise.all([loadZN,loadData,loadMaps,loadWeekly,loadLanguages])` resolves), matching the flag's original
+2024 intent ("prevent state send before maps have been loaded") instead of only firing on receipt of a peer's
+map.
+
+**Fix** (2 lines, `server/server.js:162` + `scripts-v10/zn-v5.js`): send the sentinel unquoted
+(`ws.send('-')`), and set `map_loaded = true` on the client's own map-data-ready promise rather than only on
+receiving a peer's map.
+
+**Verified live**, no monkey-patching, real UI-equivalent calls: created a brand-new room in tab 1 —
+`state_received`/`map_loaded` were both `true` immediately after connecting (previously stuck `false`
+forever). Toggling evidence in tab 1 now actually sends over the wire (previously 0 messages sent). Tab 2
+joined the same room and received the current state on connect. With both tabs left open (no reload),
+toggling a *second* evidence item in tab 1 propagated live to tab 2's state and DOM immediately — confirming
+"bug 2" from the investigation above was a downstream symptom of never getting past this deadlock, not a
+separate live-render defect.
+
 ## 2026-08-02 session
 
 ### Fixed regressions from the zero-network.net delinking work

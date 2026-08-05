@@ -295,6 +295,11 @@ function loadAllAndConnect(){
         document.getElementById("page-loading-status").innerText = "loading ghost & map data..."
         Promise.all([loadZN,loadData,loadMaps,loadWeekly,loadLanguages])
         .then(() => {
+            // This client's own map data/DOM is ready, so it's now safe for
+            // send_state() (wslink-v8.js) to include a map — don't gate this
+            // on having received a peer's map first, or a brand-new room's
+            // first client can never send anything (see docs/PROGRESS.md).
+            map_loaded = true
             setLoading(80)
             document.getElementById("page-loading-status").innerText = "translating page..."
             Promise.all([translate(lang)])
