@@ -63,7 +63,7 @@ function loadAllAndConnect(){
             lang = 'en'
         }
         try{
-            fetch(`/phasmophobia/data/ghosts.json`, {cache: 'default', signal: AbortSignal.timeout(10000)})
+            fetch(buildApiUrl(`/phasmophobia/data/ghosts.json`, window.electronAPI && window.electronAPI.serverUrl), {cache: 'default', signal: AbortSignal.timeout(10000)})
             .then(data => data.json())
             .then(data => {
 
@@ -200,7 +200,7 @@ function loadAllAndConnect(){
     })
 
     let loadMaps = new Promise((resolve, reject) => {
-        fetch("/phasmophobia/data/maps", {cache: 'default', signal: AbortSignal.timeout(12000)})
+        fetch(buildApiUrl("/phasmophobia/data/maps", window.electronAPI && window.electronAPI.serverUrl), {cache: 'default', signal: AbortSignal.timeout(12000)})
         .then(data => data.json())
         .then(data => {
             var map_html = ""
@@ -235,7 +235,7 @@ function loadAllAndConnect(){
     })
 
     let loadWeekly = new Promise((resolve, reject) => {
-        fetch("/phasmophobia/data/weekly.json", {cache: 'default', signal: AbortSignal.timeout(10000)})
+        fetch(buildApiUrl("/phasmophobia/data/weekly.json", window.electronAPI && window.electronAPI.serverUrl), {cache: 'default', signal: AbortSignal.timeout(10000)})
         .then(data => data.json())
         .then(data => {
             weekly_data = {
