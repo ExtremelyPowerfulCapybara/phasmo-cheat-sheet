@@ -4,6 +4,70 @@ Running log of what's been done since the Electron rewrite landed, and what's le
 `docs/superpowers/plans/2026-08-02-electron-rewrite.md` and
 `docs/superpowers/specs/2026-08-02-electron-rewrite-design.md` for the original rewrite plan/design this builds on.
 
+## 2026-08-05 session — Bundled frontend + thin relay server
+
+Implemented `docs/superpowers/specs/2026-08-05-bundled-frontend-design.md` /
+`docs/superpowers/plans/2026-08-05-bundled-frontend.md` via subagent-driven development (9 tasks + one
+ad-hoc fix, each independently reviewed, plus a final whole-branch review — see the plan file's linked
+SDD ledger for the full task-by-task record).
+
+### What changed
+The Electron app's main window now loads its frontend (`index.html`, `scripts-v10/`, `styles-v10/`, etc.)
+from files bundled directly into the app package via `loadFile()`, instead of fetching it at runtime from
+the shared relay server (`phasmo.mustardhq.dev`) via `loadURL()`. The app now depends on that server only
+for game-data JSON (`ghosts.json`/`maps`/`weekly.json`) and the WebSocket room relay — both reached via
+absolute URLs built from `electron/config.json`'s `serverUrl` (repurposed: same key, now means "API base
+URL" instead of "page to load") through a new `buildApiUrl`/`buildWsUrl` helper
+(`electron/api-url.js` + a synced copy at `scripts-v10/api-url.js` for the browser-loaded side).
+`server/server.js` is unchanged — it still serves the static frontend too, as a browser-only fallback for
+anyone who doesn't want to install the app.
+
+Also added: a single-instance lock (`app.requestSingleInstanceLock()`) so a second launch just refocuses
+the first instance, a `before-quit` handler that destroys the overlay/Hotkey Manager/Overlay Settings
+windows as defense-in-depth alongside the existing `closed`-handler `app.quit()` fix, and `electron-updater`
+wired to the project's GitHub Releases feed with a non-blocking on-launch check.
+
+### Root-cause note: the "still broken" reports at the start of this session
+This project was kicked off because a WebSocket-reconnect fix and an orphan-process fix both appeared to
+"still be broken" after supposedly being fixed in an earlier session. Investigation found both were never
+actually deployed/shipped — the reconnect fix was committed locally but never pushed to the server the
+installed app talks to, and the orphan-process fix predated the last tagged release the user had installed.
+**Lesson reinforced this session, twice more:** always verify a fix was actually shipped before concluding
+it doesn't work.
+- Mid-Task-9 verification, the user reported the exact same two symptoms again ("still leaves orphaned
+  processes," "bad gateway with server offline"). Root cause: they'd tested the *old* Aug-3 `v1.0.0`
+  installed build (confirmed by extracting its `app.asar` — it still had `loadURL`/no `app.quit()` in the
+  `closed` handler), not the newly built installer sitting in the worktree's `dist/` folder. Once
+  reinstalled from the correct `.exe`, both issues were gone — no code defect.
+
+### Verified on real hardware (Task 9)
+- Packaging smoke test: fresh install, relay server stopped, bundled UI loads correctly (shows the app's
+  own in-app data-load error instead of a browser net-error page) — confirms the app no longer depends on
+  the relay server for its own code.
+- Orphan-process test: closed via the main window's X button, `Get-Process "Phasmo Cheat Sheet"` returned
+  nothing — the fix that had never shipped in three prior attempts is now confirmed working.
+- Reconnect-after-network-blip test: two browser tabs, one tab's connection dropped via DevTools "Offline"
+  (server process left running), status correctly showed "Reconnecting..." and recovered automatically —
+  the two-client sync test that had been owed since a prior session is now finally done.
+- Auto-update smoke test: deferred (requires cutting a real GitHub release) — not yet performed.
+
+### New bugs found (out of scope for this project, spawned as a follow-up)
+While verifying live evidence sync between two freshly-connected clients (not a reconnect scenario — a
+brand-new room), found two real, pre-existing bugs in `wslink-v8.js`'s sync logic, unrelated to anything
+this session's plan touched:
+1. **`map_loaded` deadlock** — `send_state()`'s guard requires `hasLink && state_received && map_loaded`,
+   but `map_loaded` is only ever set `true` by *receiving* a peer's synced state — never by any local
+   action. Two brand-new clients can never send a first update to each other; it's a mutual deadlock.
+2. **Live updates don't render without a reload** — even after manually forcing `map_loaded = true` to get
+   past bug 1, a change made in one already-open tab only appeared in the other tab after reloading it
+   (the reload picks up the server's cached `room.state`; the already-open tab's live `ws.onmessage`
+   handler isn't applying the update).
+
+This is quite possibly the actual root cause of the very first "connected on both ends but doesn't update"
+report that started this whole multi-session effort. Flagged as background task `task_dd8f5327` with full
+investigation notes (root cause hypotheses, exact file:line references, repro steps) for a dedicated
+follow-up session — not fixed here, to keep this project's diff scoped to bundling/packaging/lifecycle.
+
 ## 2026-08-02 session
 
 ### Fixed regressions from the zero-network.net delinking work
